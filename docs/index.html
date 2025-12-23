@@ -25,6 +25,11 @@
         margin-top: 16px;
         padding: 10px 16px;
       }
+      .mode-label {
+        margin-left: 12px;
+        font-size: 0.9rem;
+        color: #555;
+      }
       .status {
         margin-top: 12px;
         font-style: italic;
@@ -52,6 +57,7 @@
     <textarea id="context" placeholder="Add any context"></textarea>
 
     <button id="analyze-button" type="button">Analyze</button>
+    <span id="mode-label" class="mode-label"></span>
     <div id="status" class="status" hidden>Thinking...</div>
     <div id="error" class="error" hidden></div>
 
@@ -81,11 +87,16 @@
       const status = document.getElementById('status');
       const error = document.getElementById('error');
       const result = document.getElementById('result');
+      const modeLabel = document.getElementById('mode-label');
 
       const audienceList = document.getElementById('audience-list');
       const metricsList = document.getElementById('metrics-list');
       const risksList = document.getElementById('risks-list');
       const approachesList = document.getElementById('approaches-list');
+      const isPagesMode =
+        location.hostname.includes('github.io') || location.hostname.endsWith('.github.io');
+
+      modeLabel.textContent = isPagesMode ? 'Mode: Pages (mock)' : 'Mode: Local/API';
 
       const renderList = (element, items) => {
         element.innerHTML = '';
@@ -96,6 +107,19 @@
         });
       };
 
+      const getMockResponse = () => ({
+        analysis: {
+          audience: ['New users', 'Returning users'],
+          metrics: ['Activation rate', 'Conversion rate', 'Retention'],
+          risks: ['Unclear success metric', 'Edge cases not covered'],
+          approaches: [
+            'Simplify the flow and reduce steps',
+            'Add contextual hints and progressive disclosure',
+            'A/B test variants and track key metrics',
+          ],
+        },
+      });
+
       button.addEventListener('click', async () => {
         status.hidden = false;
         error.hidden = true;
@@ -103,29 +127,34 @@
         error.textContent = '';
 
         try {
-          const response = await fetch('/analyze', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              task: taskInput.value,
-              context: contextInput.value,
-            }),
-          });
+          let data = null;
+          if (isPagesMode) {
+            data = getMockResponse();
+          } else {
+            const response = await fetch('/analyze', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                task: taskInput.value,
+                context: contextInput.value,
+              }),
+            });
 
-          if (!response.ok) {
-            const data = await response.json();
-            if (response.status === 400 && data?.error) {
-              error.textContent = data.error;
-            } else {
-              error.textContent = 'Something went wrong. Please try again.';
+            if (!response.ok) {
+              const responseData = await response.json();
+              if (response.status === 400 && responseData?.error) {
+                error.textContent = responseData.error;
+              } else {
+                error.textContent = 'Something went wrong. Please try again.';
+              }
+              error.hidden = false;
+              return;
             }
-            error.hidden = false;
-            return;
-          }
 
-          const data = await response.json();
+            data = await response.json();
+          }
           const analysis = data.analysis || {};
 
           renderList(audienceList, analysis.audience || []);
