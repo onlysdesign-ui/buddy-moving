@@ -1,20 +1,42 @@
-body {
-  margin: 0;
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: var(--gray-1);
-  color: var(--gray-12);
-}
-
 :root {
   color-scheme: dark;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #0b0c10;
+  color: #f5f5f6;
+}
+
+.page {
+  min-height: 100vh;
+  padding: 48px 20px 80px;
+  background: radial-gradient(
+      circle at top left,
+      rgba(79, 92, 255, 0.18),
+      transparent 45%
+    ),
+    #0b0c10;
+}
+
+.app-shell {
+  max-width: 980px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
 .app-header {
-  padding: 8px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .logo-button {
@@ -28,65 +50,154 @@ body {
 }
 
 .logo-button img {
-  height: 56px;
+  height: 58px;
   width: auto;
+}
+
+.subtitle {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.95rem;
 }
 
 .panel {
   background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 20px;
-  padding: 24px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(10px);
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .input-panel {
-  padding: 28px;
+  padding: 4px;
 }
 
-.large-input textarea {
-  font-size: 1rem;
-  line-height: 1.6;
-  padding: 16px 18px;
-  min-height: 140px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid transparent;
-  border-radius: 16px;
-  color: inherit;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+.textarea-wrapper {
+  background: rgba(13, 15, 20, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
 }
 
-.large-input textarea:focus {
-  outline: none;
-  border-color: rgba(168, 182, 255, 0.6);
-  box-shadow: 0 0 0 3px rgba(120, 140, 255, 0.25);
+.textarea-wrapper:focus-within {
+  border-color: rgba(122, 140, 255, 0.55) !important;
+  box-shadow: 0 0 0 3px rgba(120, 140, 255, 0.2) !important;
 }
 
-.analyze-button {
-  font-size: 1rem;
-  padding: 12px 24px;
-  min-height: 44px;
+.textarea-input {
+  font-size: 1rem !important;
+  line-height: 1.6 !important;
+  padding: 14px 16px !important;
+  color: inherit !important;
+}
+
+.actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.status {
+  min-height: 28px;
+}
+
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 20px;
 }
 
 .result-panel {
-  padding: 24px;
+  padding: 4px;
 }
 
-@media (max-width: 768px) {
+.result-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.result-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.result-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.preformatted {
+  white-space: pre-wrap;
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.muted {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.error-panel {
+  border-color: rgba(255, 120, 120, 0.25);
+}
+
+.error-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 20;
+}
+
+.toast-card {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  max-width: 320px;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 32px 16px 64px;
+  }
+
   .logo-button img {
     height: 48px;
   }
 
-  .panel {
-    padding: 20px;
+  .actions-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
-  .input-panel {
-    padding: 22px;
+  .status {
+    min-height: auto;
   }
 
-  .large-input textarea {
-    min-height: 120px;
+  .toast {
+    left: 16px;
+    right: 16px;
   }
 }

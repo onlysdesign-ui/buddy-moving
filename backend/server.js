@@ -193,9 +193,56 @@ Context: ${context || "(none)"}
 
 app.get("*", (req, res) => {
   if (!fs.existsSync(indexPath)) {
-    return res
-      .status(503)
-      .send("Frontend is not built yet. Run `npm run build` to generate /dist.");
+    return res.status(503).send(`<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BuddyMoving</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        background: #0b0c10;
+        color: #f5f5f6;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+      }
+      main {
+        max-width: 520px;
+        padding: 32px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      h1 {
+        margin: 0 0 12px;
+        font-size: 1.4rem;
+      }
+      p {
+        margin: 0;
+        color: rgba(255, 255, 255, 0.75);
+        line-height: 1.6;
+      }
+      code {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 6px 10px;
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Frontend not built</h1>
+      <p>Run the build to generate the Vite assets for BuddyMoving.</p>
+      <code>npm run build</code>
+    </main>
+  </body>
+</html>`);
   }
   res.sendFile(indexPath);
 });
