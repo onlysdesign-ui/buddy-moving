@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "npm --prefix frontend run dev",
-    "build": "npm --prefix frontend run build",
+    "build": "npm --prefix frontend ci && npm --prefix frontend run build",
     "build:gh": "DEPLOY_TARGET=gh-pages npm --prefix frontend run build",
     "start": "node backend/server.js",
     "render-start": "npm run build && npm run start"

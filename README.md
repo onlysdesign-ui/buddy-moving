@@ -43,7 +43,7 @@ Frontend (`frontend/.env`):
 
 **Build command**
 ```bash
-npm install && npm run build
+npm ci && npm run build
 ```
 
 **Start command**
@@ -54,6 +54,7 @@ npm run start
 **Environment variables (Render)**
 - `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`
 - `VITE_API_BASE` (set to the Render URL of this service)
+- `NPM_CONFIG_REGISTRY=https://registry.npmjs.org/`
 
 ## Troubleshooting
 
@@ -65,6 +66,7 @@ npm run start
 - Add a `.npmrc` in the repo root:
   ```
   registry=https://registry.npmjs.org/
+  always-auth=false
   ```
 
 **Cloudflare challenge / gateway blocks**

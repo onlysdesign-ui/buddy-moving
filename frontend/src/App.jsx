@@ -1,18 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Box,
   Button,
-  Callout,
   Card,
-  Container,
-  Flex,
-  Grid,
-  Heading,
+  CardBody,
+  CardHeader,
+  Chip,
   Spinner,
-  Text,
-  TextArea
-} from "@radix-ui/themes";
-import { InfoCircledIcon } from "@radix-ui/react-icons";
+  Textarea
+} from "@heroui/react";
 
 const sectionLabels = {
   audience: "Audience",
@@ -34,38 +29,32 @@ const sectionOrder = [
 
 const renderContent = (value) => {
   if (!value) {
-    return <Text color="gray">No details yet.</Text>;
+    return <p className="muted">No details yet.</p>;
   }
 
   if (Array.isArray(value)) {
     return (
-      <Flex direction="column" gap="2">
+      <ul className="result-list">
         {value.map((item, index) => (
-          <Text key={`${item}-${index}`} size="2">
-            • {item}
-          </Text>
+          <li key={`${item}-${index}`}>{item}</li>
         ))}
-      </Flex>
+      </ul>
     );
   }
 
   if (typeof value === "object") {
     return (
-      <Flex direction="column" gap="2">
+      <div className="result-stack">
         {Object.entries(value).map(([key, entry]) => (
-          <Text key={key} size="2">
+          <p key={key}>
             <strong>{key}:</strong> {String(entry)}
-          </Text>
+          </p>
         ))}
-      </Flex>
+      </div>
     );
   }
 
-  return (
-    <Text size="2" style={{ whiteSpace: "pre-wrap" }}>
-      {String(value)}
-    </Text>
-  );
+  return <p className="preformatted">{String(value)}</p>;
 };
 
 function App() {
@@ -74,8 +63,18 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const [toast, setToast] = useState(null);
 
   const apiBase = import.meta.env.VITE_API_BASE || "";
+
+  useEffect(() => {
+    if (!toast) {
+      return undefined;
+    }
+
+    const timer = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const handleReset = () => {
     setTask("");
@@ -83,14 +82,17 @@ function App() {
     setResult(null);
     setError("");
     setLoading(false);
+    setToast(null);
   };
 
   const handleAnalyze = async () => {
     setError("");
     setResult(null);
+    setToast(null);
 
     if (!task.trim()) {
       setError("Please describe the task before analyzing.");
+      setToast({ message: "Add a task description to analyze.", tone: "warning" });
       return;
     }
 
@@ -111,98 +113,135 @@ function App() {
 
       const data = await response.json();
       setResult(data?.analysis ?? data);
+      setToast({ message: "Analysis complete.", tone: "success" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message =
+        err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      setToast({ message, tone: "danger" });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Box style={{ minHeight: "100vh", padding: "48px 0" }}>
-      <Container size="3">
-        <Flex direction="column" gap="5">
-          <Box className="app-header">
-            <Flex align="center" gap="4" wrap="wrap">
-              <button
-                type="button"
-                onClick={handleReset}
-                aria-label="Reset BuddyMoving"
-                className="logo-button"
+    <div className="page">
+      {toast && (
+        <div className="toast">
+          <Card className={`toast-card toast-${toast.tone}`} shadow="lg">
+            <CardBody>
+              <div className="toast-content">
+                <Chip color={toast.tone} variant="flat" size="sm">
+                  {toast.tone === "success" ? "Done" : "Notice"}
+                </Chip>
+                <span>{toast.message}</span>
+              </div>
+            </CardBody>
+          </Card>
+        </div>
+      )}
+
+      <div className="app-shell">
+        <header className="app-header">
+          <button
+            type="button"
+            onClick={handleReset}
+            aria-label="Reset BuddyMoving"
+            className="logo-button"
+          >
+            <img src="/buddymoving.svg" alt="BuddyMoving" />
+          </button>
+          <p className="subtitle">
+            Product-design copilot for smarter product decisions.
+          </p>
+        </header>
+
+        <Card className="panel input-panel" shadow="lg">
+          <CardBody className="panel-body">
+            <Textarea
+              label="Task"
+              labelPlacement="outside"
+              placeholder="Describe the task or feature you want to analyze"
+              value={task}
+              onValueChange={setTask}
+              minRows={6}
+              size="lg"
+              radius="lg"
+              variant="bordered"
+              classNames={{
+                inputWrapper: "textarea-wrapper",
+                input: "textarea-input"
+              }}
+            />
+            <Textarea
+              label="Context"
+              labelPlacement="outside"
+              placeholder="Share context, constraints, or goals"
+              value={context}
+              onValueChange={setContext}
+              minRows={6}
+              size="lg"
+              radius="lg"
+              variant="bordered"
+              classNames={{
+                inputWrapper: "textarea-wrapper",
+                input: "textarea-input"
+              }}
+            />
+            <div className="actions-row">
+              <div className="status">
+                {loading && (
+                  <Chip
+                    size="sm"
+                    color="primary"
+                    variant="flat"
+                    startContent={<Spinner size="sm" color="current" />}
+                  >
+                    Analyzing
+                  </Chip>
+                )}
+              </div>
+              <Button
+                size="lg"
+                radius="lg"
+                color="primary"
+                onPress={handleAnalyze}
+                isDisabled={loading}
+                startContent={
+                  loading ? <Spinner size="sm" color="current" /> : null
+                }
               >
-                <img src="/buddymoving.svg" alt="BuddyMoving" />
-              </button>
-              <Box>
-                <Text color="gray" size="2">
-                  Product-design copilot for smarter product decisions.
-                </Text>
-              </Box>
-            </Flex>
-          </Box>
+                Analyze
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
 
-          <Box className="panel input-panel">
-            <Flex direction="column" gap="4">
-              <Box>
-                <Text as="label" size="2" weight="medium">
-                  Task
-                </Text>
-                <TextArea
-                  className="large-input"
-                  placeholder="Describe the task or feature you want to analyze"
-                  value={task}
-                  onChange={(event) => setTask(event.target.value)}
-                  mt="2"
-                  size="3"
-                />
-              </Box>
-              <Box>
-                <Text as="label" size="2" weight="medium">
-                  Context
-                </Text>
-                <TextArea
-                  className="large-input"
-                  placeholder="Share context, constraints, or goals"
-                  value={context}
-                  onChange={(event) => setContext(event.target.value)}
-                  mt="2"
-                  size="3"
-                />
-              </Box>
-              <Flex justify="end" align="center" gap="3">
-                {loading && <Spinner size="3" />}
-                <Button
-                  className="analyze-button"
-                  onClick={handleAnalyze}
-                  disabled={loading}
-                >
-                  Analyze
-                </Button>
-              </Flex>
-            </Flex>
-          </Box>
+        {error && (
+          <Card className="panel error-panel" shadow="lg">
+            <CardBody>
+              <div className="error-content">
+                <Chip color="danger" variant="flat" size="sm">
+                  Error
+                </Chip>
+                <span>{error}</span>
+              </div>
+            </CardBody>
+          </Card>
+        )}
 
-          {error && (
-            <Callout.Root color="red">
-              <Callout.Icon>
-                <InfoCircledIcon />
-              </Callout.Icon>
-              <Callout.Text>{error}</Callout.Text>
-            </Callout.Root>
-          )}
-
-          <Grid columns={{ initial: "1", md: "2" }} gap="4">
-            {sectionOrder.map((key) => (
-              <Box key={key} className="panel result-panel">
-                <Flex direction="column" gap="3">
-                  <Heading size="4">{sectionLabels[key]}</Heading>
-                  {renderContent(result?.[key])}
-                </Flex>
-              </Box>
-            ))}
-          </Grid>
-        </Flex>
-      </Container>
-    </Box>
+        <div className="results-grid">
+          {sectionOrder.map((key) => (
+            <Card key={key} className="panel result-panel" shadow="lg">
+              <CardHeader className="result-header">
+                <h3>{sectionLabels[key]}</h3>
+              </CardHeader>
+              <CardBody>{renderContent(result?.[key])}</CardBody>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
