@@ -34,7 +34,11 @@ const sectionOrder = [
 
 const renderContent = (value) => {
   if (!value) {
-    return <Text color="gray">No details yet.</Text>;
+    return (
+      <Text color="gray" size="2">
+        No data yet.
+      </Text>
+    );
   }
 
   if (Array.isArray(value)) {
@@ -120,17 +124,22 @@ function App() {
 
   return (
     <Box style={{ minHeight: "100vh", padding: "48px 0" }}>
-      <Container size="3">
-        <Flex direction="column" gap="5">
+      <Container size="4" style={{ maxWidth: 960 }}>
+        <Flex direction="column" gap="6">
           <Box className="app-header">
-            <Flex align="center" gap="4" wrap="wrap">
+            <Flex
+              align={{ initial: "start", sm: "center" }}
+              direction={{ initial: "column", sm: "row" }}
+              gap="3"
+              justify="between"
+            >
               <button
                 type="button"
                 onClick={handleReset}
                 aria-label="Reset BuddyMoving"
                 className="logo-button"
               >
-                <img src="/buddymoving.svg" alt="BuddyMoving" />
+                <img src="/buddymoving.svg" alt="BuddyMoving logo" />
               </button>
               <Box>
                 <Text color="gray" size="2">
@@ -140,14 +149,19 @@ function App() {
             </Flex>
           </Box>
 
-          <Box className="panel input-panel">
+          <Card className="form-card">
             <Flex direction="column" gap="4">
               <Box>
-                <Text as="label" size="2" weight="medium">
-                  Task
-                </Text>
+                <Flex direction="column" gap="1">
+                  <Text as="label" size="2" weight="medium">
+                    Task
+                  </Text>
+                  <Text size="1" color="gray">
+                    Outline what you want BuddyMoving to evaluate.
+                  </Text>
+                </Flex>
                 <TextArea
-                  className="large-input"
+                  className="input-textarea task-textarea"
                   placeholder="Describe the task or feature you want to analyze"
                   value={task}
                   onChange={(event) => setTask(event.target.value)}
@@ -156,11 +170,16 @@ function App() {
                 />
               </Box>
               <Box>
-                <Text as="label" size="2" weight="medium">
-                  Context
-                </Text>
+                <Flex direction="column" gap="1">
+                  <Text as="label" size="2" weight="medium">
+                    Context
+                  </Text>
+                  <Text size="1" color="gray">
+                    Share constraints, goals, or background that matters.
+                  </Text>
+                </Flex>
                 <TextArea
-                  className="large-input"
+                  className="input-textarea context-textarea"
                   placeholder="Share context, constraints, or goals"
                   value={context}
                   onChange={(event) => setContext(event.target.value)}
@@ -168,18 +187,20 @@ function App() {
                   size="3"
                 />
               </Box>
-              <Flex justify="end" align="center" gap="3">
-                {loading && <Spinner size="3" />}
+              <Flex justify="end">
                 <Button
                   className="analyze-button"
                   onClick={handleAnalyze}
                   disabled={loading}
                 >
-                  Analyze
+                  <Flex align="center" gap="2">
+                    {loading && <Spinner size="2" />}
+                    <span>{loading ? "Analyzing" : "Analyze"}</span>
+                  </Flex>
                 </Button>
               </Flex>
             </Flex>
-          </Box>
+          </Card>
 
           {error && (
             <Callout.Root color="red">
@@ -192,12 +213,12 @@ function App() {
 
           <Grid columns={{ initial: "1", md: "2" }} gap="4">
             {sectionOrder.map((key) => (
-              <Box key={key} className="panel result-panel">
+              <Card key={key} className="result-card">
                 <Flex direction="column" gap="3">
                   <Heading size="4">{sectionLabels[key]}</Heading>
                   {renderContent(result?.[key])}
                 </Flex>
-              </Box>
+              </Card>
             ))}
           </Grid>
         </Flex>
