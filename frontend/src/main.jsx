@@ -4,6 +4,8 @@ import "./index.css";
 import App from "./App.jsx";
 import { HeroUIProvider } from "@heroui/react";
 
+document.documentElement.classList.add("dark");
+
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
     <HeroUIProvider>

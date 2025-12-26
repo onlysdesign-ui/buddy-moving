@@ -5,7 +5,7 @@ import {
   CardBody,
   CardHeader,
   Chip,
-  Spinner,
+  Spacer,
   Textarea
 } from "@heroui/react";
 
@@ -29,12 +29,12 @@ const sectionOrder = [
 
 const renderContent = (value) => {
   if (!value) {
-    return <p className="muted">No details yet.</p>;
+    return <p>No details yet.</p>;
   }
 
   if (Array.isArray(value)) {
     return (
-      <ul className="result-list">
+      <ul>
         {value.map((item, index) => (
           <li key={`${item}-${index}`}>{item}</li>
         ))}
@@ -44,7 +44,7 @@ const renderContent = (value) => {
 
   if (typeof value === "object") {
     return (
-      <div className="result-stack">
+      <div>
         {Object.entries(value).map(([key, entry]) => (
           <p key={key}>
             <strong>{key}:</strong> {String(entry)}
@@ -54,7 +54,7 @@ const renderContent = (value) => {
     );
   }
 
-  return <p className="preformatted">{String(value)}</p>;
+  return <p>{String(value)}</p>;
 };
 
 function App() {
@@ -65,7 +65,7 @@ function App() {
   const [result, setResult] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const apiBase = import.meta.env.VITE_API_BASE || "";
+  const apiBase = import.meta.env.VITE_API_BASE || window.location.origin;
 
   useEffect(() => {
     if (!toast) {
@@ -126,21 +126,6 @@ function App() {
 
   return (
     <div className="page">
-      {toast && (
-        <div className="toast">
-          <Card className={`toast-card toast-${toast.tone}`} shadow="lg">
-            <CardBody>
-              <div className="toast-content">
-                <Chip color={toast.tone} variant="flat" size="sm">
-                  {toast.tone === "success" ? "Done" : "Notice"}
-                </Chip>
-                <span>{toast.message}</span>
-              </div>
-            </CardBody>
-          </Card>
-        </div>
-      )}
-
       <div className="app-shell">
         <header className="app-header">
           <button
@@ -156,8 +141,8 @@ function App() {
           </p>
         </header>
 
-        <Card className="panel input-panel" shadow="lg">
-          <CardBody className="panel-body">
+        <Card shadow="sm">
+          <CardBody>
             <Textarea
               label="Task"
               labelPlacement="outside"
@@ -166,13 +151,9 @@ function App() {
               onValueChange={setTask}
               minRows={6}
               size="lg"
-              radius="lg"
-              variant="bordered"
-              classNames={{
-                inputWrapper: "textarea-wrapper",
-                input: "textarea-input"
-              }}
+              variant="flat"
             />
+            <Spacer y={4} />
             <Textarea
               label="Context"
               labelPlacement="outside"
@@ -181,59 +162,48 @@ function App() {
               onValueChange={setContext}
               minRows={6}
               size="lg"
-              radius="lg"
-              variant="bordered"
-              classNames={{
-                inputWrapper: "textarea-wrapper",
-                input: "textarea-input"
-              }}
+              variant="flat"
             />
+            <Spacer y={4} />
             <div className="actions-row">
-              <div className="status">
-                {loading && (
-                  <Chip
-                    size="sm"
-                    color="primary"
-                    variant="flat"
-                    startContent={<Spinner size="sm" color="current" />}
-                  >
-                    Analyzing
-                  </Chip>
-                )}
-              </div>
               <Button
                 size="lg"
-                radius="lg"
                 color="primary"
                 onPress={handleAnalyze}
+                isLoading={loading}
                 isDisabled={loading}
-                startContent={
-                  loading ? <Spinner size="sm" color="current" /> : null
-                }
+                fullWidth
               >
                 Analyze
               </Button>
+              {loading && (
+                <Chip color="primary" variant="flat" size="sm">
+                  Analyzing…
+                </Chip>
+              )}
+              {toast && !loading && (
+                <Chip color={toast.tone} variant="flat" size="sm">
+                  {toast.message}
+                </Chip>
+              )}
             </div>
           </CardBody>
         </Card>
 
         {error && (
-          <Card className="panel error-panel" shadow="lg">
+          <Card shadow="sm">
             <CardBody>
-              <div className="error-content">
-                <Chip color="danger" variant="flat" size="sm">
-                  Error
-                </Chip>
-                <span>{error}</span>
-              </div>
+              <Chip color="danger" variant="flat" size="sm">
+                {error}
+              </Chip>
             </CardBody>
           </Card>
         )}
 
         <div className="results-grid">
           {sectionOrder.map((key) => (
-            <Card key={key} className="panel result-panel" shadow="lg">
-              <CardHeader className="result-header">
+            <Card key={key} shadow="sm">
+              <CardHeader>
                 <h3>{sectionLabels[key]}</h3>
               </CardHeader>
               <CardBody>{renderContent(result?.[key])}</CardBody>
