@@ -60,6 +60,12 @@ npm install
 npm run build
 ```
 
+### Render build command
+
+```bash
+npm config set registry https://registry.npmjs.org/ && npm install && npm run build
+```
+
 После сборки замените содержимое `docs/` артефактами из `frontend/dist`:
 
 ```bash
