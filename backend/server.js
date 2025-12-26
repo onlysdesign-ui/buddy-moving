@@ -19,7 +19,7 @@ console.log("AI_MODEL:", AI_MODEL);
 
 app.use(express.json());
 
-const distPath = path.join(__dirname, "../dist");
+const distPath = path.join(__dirname, "../frontend/dist");
 const indexPath = path.join(distPath, "index.html");
 
 if (!fs.existsSync(indexPath)) {
