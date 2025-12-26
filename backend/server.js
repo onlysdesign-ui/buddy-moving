@@ -1,4 +1,5 @@
 const express = require("express");
+const fs = require("fs");
 const path = require("path");
 const { execFile } = require("child_process");
 const dotenv = require("dotenv");
@@ -19,6 +20,13 @@ console.log("AI_MODEL:", AI_MODEL);
 app.use(express.json());
 
 const distPath = path.join(__dirname, "../dist");
+const indexPath = path.join(distPath, "index.html");
+
+if (!fs.existsSync(indexPath)) {
+  console.warn("⚠️ dist/index.html not found. Frontend is not built yet.");
+  console.warn("Expected at:", indexPath);
+}
+
 app.use(express.static(distPath));
 
 const mockAnalysis = {
@@ -180,7 +188,12 @@ Context: ${context || "(none)"}
 });
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
+  if (!fs.existsSync(indexPath)) {
+    return res
+      .status(503)
+      .send("Frontend is not built yet. Run `npm run build` to generate /dist.");
+  }
+  res.sendFile(indexPath);
 });
 
 app.listen(port, () => {
