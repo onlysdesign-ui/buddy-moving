@@ -17,7 +17,9 @@ console.log("AI_API_KEY:", AI_API_KEY ? "set" : "missing");
 console.log("AI_MODEL:", AI_MODEL);
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "../docs")));
+
+const distPath = path.join(__dirname, "../dist");
+app.use(express.static(distPath));
 
 const mockAnalysis = {
   analysis: {
@@ -178,7 +180,7 @@ Context: ${context || "(none)"}
 });
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../docs/index.html"));
+  res.sendFile(path.join(distPath, "index.html"));
 });
 
 app.listen(port, () => {
