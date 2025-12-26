@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Box,
   Button,
@@ -13,7 +13,6 @@ import {
   TextArea
 } from "@radix-ui/themes";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
-import logo from "./assets/buddymoving.svg";
 
 const sectionLabels = {
   audience: "Audience",
@@ -76,7 +75,7 @@ function App() {
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
 
-  const apiBase = useMemo(() => import.meta.env.VITE_API_BASE, []);
+  const apiBase = import.meta.env.VITE_API_BASE || "";
 
   const handleReset = () => {
     setTask("");
@@ -92,11 +91,6 @@ function App() {
 
     if (!task.trim()) {
       setError("Please describe the task before analyzing.");
-      return;
-    }
-
-    if (!apiBase) {
-      setError("VITE_API_BASE is not configured.");
       return;
     }
 
@@ -116,7 +110,7 @@ function App() {
       }
 
       const data = await response.json();
-      setResult(data);
+      setResult(data?.analysis ?? data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -145,7 +139,11 @@ function App() {
                     cursor: "pointer"
                   }}
                 >
-                  <img src={logo} alt="BuddyMoving" style={{ height: 32 }} />
+                  <img
+                    src="/buddymoving.svg"
+                    alt="BuddyMoving"
+                    style={{ height: 32 }}
+                  />
                 </button>
                 <Box>
                   <Heading size="6">BuddyMoving</Heading>
