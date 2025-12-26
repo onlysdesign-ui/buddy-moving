@@ -1,0 +1,126 @@
+@import url("https://cdn.jsdelivr.net/npm/@radix-ui/themes@3.2.1/styles.css");
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: #f8f9fb;
+  color: #0f172a;
+}
+
+#app {
+  max-width: 960px;
+  margin: 48px auto;
+  padding: 0 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.hero h1 {
+  font-size: 40px;
+  margin-bottom: 8px;
+}
+
+.hero p {
+  color: #475569;
+  font-size: 18px;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+}
+
+label {
+  font-weight: 600;
+  display: block;
+  margin-top: 12px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 96px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+  margin-top: 8px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+button {
+  border: none;
+  background: #4f46e5;
+  color: white;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.card h2 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.content {
+  color: #334155;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.content ul {
+  padding-left: 16px;
+  margin: 0;
+}
+
+.callout {
+  padding: 16px 20px;
+  border-radius: 14px;
+  background: #ffe4e6;
+  color: #9f1239;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 3px solid #cbd5f5;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
