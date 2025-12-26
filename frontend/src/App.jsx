@@ -13,6 +13,7 @@ import {
   TextArea
 } from "@radix-ui/themes";
 import { InfoCircledIcon } from "@radix-ui/react-icons";
+import logo from "./assets/buddymoving.svg";
 
 const sectionLabels = {
   audience: "Audience",
@@ -77,6 +78,14 @@ function App() {
 
   const apiBase = useMemo(() => import.meta.env.VITE_API_BASE, []);
 
+  const handleReset = () => {
+    setTask("");
+    setContext("");
+    setResult(null);
+    setError("");
+    setLoading(false);
+  };
+
   const handleAnalyze = async () => {
     setError("");
     setResult(null);
@@ -119,14 +128,39 @@ function App() {
     <Box style={{ minHeight: "100vh", padding: "48px 0" }}>
       <Container size="3">
         <Flex direction="column" gap="5">
-          <Box>
-            <Heading size="8">BuddyMoving</Heading>
-            <Text color="gray" size="3">
-              Lightweight AI analysis for product, research, and growth teams.
-            </Text>
-          </Box>
+          <Card size="2" variant="surface">
+            <Flex align="center" justify="between" gap="4" wrap="wrap">
+              <Flex align="center" gap="3">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  aria-label="Reset BuddyMoving"
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    background: "transparent",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer"
+                  }}
+                >
+                  <img src={logo} alt="BuddyMoving" style={{ height: 32 }} />
+                </button>
+                <Box>
+                  <Heading size="6">BuddyMoving</Heading>
+                  <Text color="gray" size="2">
+                    Product-design copilot for smarter product decisions.
+                  </Text>
+                </Box>
+              </Flex>
+              <Text color="gray" size="2">
+                Lightweight AI analysis for product, research, and growth teams.
+              </Text>
+            </Flex>
+          </Card>
 
-          <Card>
+          <Card variant="surface">
             <Flex direction="column" gap="4">
               <Box>
                 <Text as="label" size="2" weight="medium">
