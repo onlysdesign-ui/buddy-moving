@@ -3,172 +3,62 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Buddy Moving</title>
-    <style>
-      body {
-        font-family: Arial, sans-serif;
-        margin: 24px;
-        max-width: 720px;
-      }
-      label {
-        display: block;
-        font-weight: 600;
-        margin-top: 16px;
-      }
-      textarea {
-        width: 100%;
-        min-height: 90px;
-        margin-top: 8px;
-        padding: 8px;
-      }
-      button {
-        margin-top: 16px;
-        padding: 10px 16px;
-      }
-      .mode-label {
-        margin-left: 12px;
-        font-size: 0.9rem;
-        color: #555;
-      }
-      .status {
-        margin-top: 12px;
-        font-style: italic;
-      }
-      .error {
-        color: #b00020;
-        margin-top: 12px;
-      }
-      .result {
-        margin-top: 20px;
-        border-top: 1px solid #ddd;
-        padding-top: 12px;
-      }
-      .section {
-        margin-top: 12px;
-      }
-    </style>
+    <title>BuddyMoving</title>
+    <link rel="stylesheet" href="/buddy-moving/assets/index.css" />
   </head>
   <body>
-    <h1>Buddy Moving</h1>
-    <label for="task">Task</label>
-    <textarea id="task" placeholder="Describe the task"></textarea>
+    <div id="app">
+      <header class="hero">
+        <h1>BuddyMoving</h1>
+        <p>Lightweight AI analysis for product, research, and growth teams.</p>
+      </header>
 
-    <label for="context">Context</label>
-    <textarea id="context" placeholder="Add any context"></textarea>
+      <section class="card">
+        <label for="task">Task</label>
+        <textarea id="task" placeholder="Describe the task or feature you want to analyze"></textarea>
 
-    <button id="analyze-button" type="button">Analyze</button>
-    <span id="mode-label" class="mode-label"></span>
-    <div id="status" class="status" hidden>Thinking...</div>
-    <div id="error" class="error" hidden></div>
+        <label for="context">Context</label>
+        <textarea id="context" placeholder="Share context, constraints, or goals"></textarea>
 
-    <div id="result" class="result" hidden>
-      <div class="section">
-        <h2>Audience</h2>
-        <ul id="audience-list"></ul>
+        <div class="actions">
+          <div id="loading" class="spinner" hidden></div>
+          <button id="analyze-button" type="button">Analyze</button>
+        </div>
+      </section>
+
+      <div id="error" class="callout" hidden>
+        <strong>Something went wrong</strong>
+        <span id="error-message"></span>
       </div>
-      <div class="section">
-        <h2>Metrics</h2>
-        <ul id="metrics-list"></ul>
-      </div>
-      <div class="section">
-        <h2>Risks</h2>
-        <ul id="risks-list"></ul>
-      </div>
-      <div class="section">
-        <h2>Approaches</h2>
-        <ul id="approaches-list"></ul>
-      </div>
+
+      <section class="grid">
+        <article class="card" data-section="audience">
+          <h2>Audience</h2>
+          <div class="content"></div>
+        </article>
+        <article class="card" data-section="metrics">
+          <h2>Metrics</h2>
+          <div class="content"></div>
+        </article>
+        <article class="card" data-section="risks">
+          <h2>Risks</h2>
+          <div class="content"></div>
+        </article>
+        <article class="card" data-section="questions">
+          <h2>Questions</h2>
+          <div class="content"></div>
+        </article>
+        <article class="card" data-section="scenarios">
+          <h2>Scenarios</h2>
+          <div class="content"></div>
+        </article>
+        <article class="card" data-section="approaches">
+          <h2>Approaches</h2>
+          <div class="content"></div>
+        </article>
+      </section>
     </div>
 
-    <script>
-      const button = document.getElementById('analyze-button');
-      const taskInput = document.getElementById('task');
-      const contextInput = document.getElementById('context');
-      const status = document.getElementById('status');
-      const error = document.getElementById('error');
-      const result = document.getElementById('result');
-      const modeLabel = document.getElementById('mode-label');
-
-      const audienceList = document.getElementById('audience-list');
-      const metricsList = document.getElementById('metrics-list');
-      const risksList = document.getElementById('risks-list');
-      const approachesList = document.getElementById('approaches-list');
-      const isPagesMode =
-        location.hostname.includes('github.io') || location.hostname.endsWith('.github.io');
-
-      modeLabel.textContent = isPagesMode ? 'Mode: Pages (mock)' : 'Mode: Local/API';
-
-      const renderList = (element, items) => {
-        element.innerHTML = '';
-        items.forEach((item) => {
-          const li = document.createElement('li');
-          li.textContent = item;
-          element.appendChild(li);
-        });
-      };
-
-      const getMockResponse = () => ({
-        analysis: {
-          audience: ['New users', 'Returning users'],
-          metrics: ['Activation rate', 'Conversion rate', 'Retention'],
-          risks: ['Unclear success metric', 'Edge cases not covered'],
-          approaches: [
-            'Simplify the flow and reduce steps',
-            'Add contextual hints and progressive disclosure',
-            'A/B test variants and track key metrics',
-          ],
-        },
-      });
-
-      button.addEventListener('click', async () => {
-        status.hidden = false;
-        error.hidden = true;
-        result.hidden = true;
-        error.textContent = '';
-
-        try {
-          let data = null;
-          if (isPagesMode) {
-            data = getMockResponse();
-          } else {
-            const response = await fetch('/analyze', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                task: taskInput.value,
-                context: contextInput.value,
-              }),
-            });
-
-            if (!response.ok) {
-              const responseData = await response.json();
-              if (response.status === 400 && responseData?.error) {
-                error.textContent = responseData.error;
-              } else {
-                error.textContent = 'Something went wrong. Please try again.';
-              }
-              error.hidden = false;
-              return;
-            }
-
-            data = await response.json();
-          }
-          const analysis = data.analysis || {};
-
-          renderList(audienceList, analysis.audience || []);
-          renderList(metricsList, analysis.metrics || []);
-          renderList(risksList, analysis.risks || []);
-          renderList(approachesList, analysis.approaches || []);
-          result.hidden = false;
-        } catch (err) {
-          error.textContent = 'Network error. Please try again.';
-          error.hidden = false;
-        } finally {
-          status.hidden = true;
-        }
-      });
-    </script>
+    <script type="module" src="/buddy-moving/assets/index.js"></script>
   </body>
 </html>

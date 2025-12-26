@@ -37,3 +37,35 @@ curl -X POST http://localhost:3000/analyze \
   -H "Content-Type: application/json" \
   -d '{"task":"Improve onboarding","context":"Focus on new users"}'
 ```
+
+## Frontend (React + Radix UI)
+
+### Локальный запуск
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+`VITE_API_BASE` должен указывать на работающий backend (например,
+`https://buddy-moving.onrender.com`).
+
+### Сборка и публикация в GitHub Pages
+
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+После сборки замените содержимое `docs/` артефактами из `frontend/dist`:
+
+```bash
+rm -rf ../docs
+cp -R dist ../docs
+```
+
+GitHub Pages использует каталог `docs/` как корень и базовый путь
+`/buddy-moving/`.
