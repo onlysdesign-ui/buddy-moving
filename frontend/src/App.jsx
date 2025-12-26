@@ -122,49 +122,32 @@ function App() {
     <Box style={{ minHeight: "100vh", padding: "48px 0" }}>
       <Container size="3">
         <Flex direction="column" gap="5">
-          <Card size="2" variant="surface">
-            <Flex align="center" justify="between" gap="4" wrap="wrap">
-              <Flex align="center" gap="3">
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  aria-label="Reset BuddyMoving"
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "transparent",
-                    border: "none",
-                    padding: 0,
-                    cursor: "pointer"
-                  }}
-                >
-                  <img
-                    src="/buddymoving.svg"
-                    alt="BuddyMoving"
-                    style={{ height: 32 }}
-                  />
-                </button>
-                <Box>
-                  <Heading size="6">BuddyMoving</Heading>
-                  <Text color="gray" size="2">
-                    Product-design copilot for smarter product decisions.
-                  </Text>
-                </Box>
-              </Flex>
-              <Text color="gray" size="2">
-                Lightweight AI analysis for product, research, and growth teams.
-              </Text>
+          <Box className="app-header">
+            <Flex align="center" gap="4" wrap="wrap">
+              <button
+                type="button"
+                onClick={handleReset}
+                aria-label="Reset BuddyMoving"
+                className="logo-button"
+              >
+                <img src="/buddymoving.svg" alt="BuddyMoving" />
+              </button>
+              <Box>
+                <Text color="gray" size="2">
+                  Product-design copilot for smarter product decisions.
+                </Text>
+              </Box>
             </Flex>
-          </Card>
+          </Box>
 
-          <Card variant="surface">
+          <Box className="panel input-panel">
             <Flex direction="column" gap="4">
               <Box>
                 <Text as="label" size="2" weight="medium">
                   Task
                 </Text>
                 <TextArea
+                  className="large-input"
                   placeholder="Describe the task or feature you want to analyze"
                   value={task}
                   onChange={(event) => setTask(event.target.value)}
@@ -177,6 +160,7 @@ function App() {
                   Context
                 </Text>
                 <TextArea
+                  className="large-input"
                   placeholder="Share context, constraints, or goals"
                   value={context}
                   onChange={(event) => setContext(event.target.value)}
@@ -186,12 +170,16 @@ function App() {
               </Box>
               <Flex justify="end" align="center" gap="3">
                 {loading && <Spinner size="3" />}
-                <Button onClick={handleAnalyze} disabled={loading}>
+                <Button
+                  className="analyze-button"
+                  onClick={handleAnalyze}
+                  disabled={loading}
+                >
                   Analyze
                 </Button>
               </Flex>
             </Flex>
-          </Card>
+          </Box>
 
           {error && (
             <Callout.Root color="red">
@@ -204,12 +192,12 @@ function App() {
 
           <Grid columns={{ initial: "1", md: "2" }} gap="4">
             {sectionOrder.map((key) => (
-              <Card key={key} variant="surface">
+              <Box key={key} className="panel result-panel">
                 <Flex direction="column" gap="3">
                   <Heading size="4">{sectionLabels[key]}</Heading>
                   {renderContent(result?.[key])}
                 </Flex>
-              </Card>
+              </Box>
             ))}
           </Grid>
         </Flex>
