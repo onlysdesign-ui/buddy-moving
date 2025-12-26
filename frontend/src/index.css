@@ -14,7 +14,7 @@ body {
 }
 
 .app-header {
-  padding: 8px 0;
+  padding: 8px 4px;
 }
 
 .logo-button {
@@ -32,62 +32,61 @@ body {
   width: auto;
 }
 
-.form-card {
-  padding: 28px;
+.panel {
   background: rgba(255, 255, 255, 0.04);
-  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(8px);
 }
 
-.input-textarea textarea {
-  font-size: 1.0625rem;
+.input-panel {
+  padding: 28px;
+}
+
+.large-input textarea {
+  font-size: 1rem;
   line-height: 1.6;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 16px 18px;
+  min-height: 140px;
+  background: rgba(255, 255, 255, 0.03);
   border: 1px solid transparent;
-  border-radius: 14px;
+  border-radius: 16px;
   color: inherit;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
   transition: box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
-.input-textarea textarea:focus {
+.large-input textarea:focus {
   outline: none;
-  border-color: rgba(165, 180, 255, 0.5);
-  box-shadow: 0 0 0 3px rgba(120, 140, 255, 0.2);
-}
-
-.task-textarea textarea {
-  min-height: 120px;
-}
-
-.context-textarea textarea {
-  min-height: 100px;
+  border-color: rgba(168, 182, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(120, 140, 255, 0.25);
 }
 
 .analyze-button {
   font-size: 1rem;
-  padding: 12px 28px;
-  min-height: 48px;
+  padding: 12px 24px;
+  min-height: 44px;
 }
 
-.result-card {
+.result-panel {
   padding: 24px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.04);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
 }
 
 @media (max-width: 768px) {
   .logo-button img {
-    height: 40px;
+    height: 48px;
   }
 
-  .form-card {
+  .panel {
+    padding: 20px;
+  }
+
+  .input-panel {
     padding: 22px;
   }
 
-  .analyze-button {
-    width: 100%;
+  .large-input textarea {
+    min-height: 120px;
   }
 }
