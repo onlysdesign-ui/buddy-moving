@@ -1,12 +1,12 @@
-:root {
-  color-scheme: light;
-}
-
 body {
   margin: 0;
   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  background: #f8f9fb;
-  color: #0f172a;
+  background: var(--gray-1);
+  color: var(--gray-12);
+}
+
+:root {
+  color-scheme: dark;
 }
 
 * {
