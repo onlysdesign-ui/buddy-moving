@@ -1,11 +1,13 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
 :root {
   font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
 
 body {
   margin: 0;
+  background-color: var(--mantine-color-dark-7);
+  color: var(--mantine-color-dark-0);
+}
+
+#root {
+  min-height: 100vh;
 }
