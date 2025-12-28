@@ -1,5 +1,4 @@
-const DEFAULT_API_BASE = "https://buddy-moving.onrender.com";
-const API_BASE_KEY = "API_BASE";
+const API_BASE = "https://buddy-moving.onrender.com";
 
 const elements = {
   task: document.getElementById("task"),
@@ -7,8 +6,6 @@ const elements = {
   analyze: document.getElementById("analyze"),
   status: document.getElementById("status"),
   toast: document.getElementById("toast"),
-  apiBase: document.getElementById("api-base"),
-  saveApi: document.getElementById("save-api"),
   cards: {
     audience: document.getElementById("audience"),
     metrics: document.getElementById("metrics"),
@@ -17,12 +14,6 @@ const elements = {
     scenarios: document.getElementById("scenarios"),
     approaches: document.getElementById("approaches"),
   },
-};
-
-const getApiBase = () => localStorage.getItem(API_BASE_KEY) || DEFAULT_API_BASE;
-const setApiBase = (value) => {
-  localStorage.setItem(API_BASE_KEY, value);
-  elements.apiBase.value = value;
 };
 
 const showToast = (message, type = "success") => {
@@ -59,10 +50,9 @@ const analyzeTask = async () => {
   }
 
   setStatus(true);
-  const apiBase = getApiBase();
 
   try {
-    const response = await fetch(`${apiBase}/analyze`, {
+    const response = await fetch(`${API_BASE}/analyze`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -89,14 +79,6 @@ const analyzeTask = async () => {
 };
 
 const init = () => {
-  elements.apiBase.value = getApiBase();
-
-  elements.saveApi.addEventListener("click", () => {
-    const value = elements.apiBase.value.trim() || DEFAULT_API_BASE;
-    setApiBase(value);
-    showToast("API base updated.");
-  });
-
   elements.analyze.addEventListener("click", analyzeTask);
 };
 
