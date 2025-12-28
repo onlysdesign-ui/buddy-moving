@@ -1,16 +1,20 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { HeroUIProvider } from "@heroui/react";
-import { ThemeProvider } from "next-themes";
+import "@mantine/core/styles.css";
+import "@mantine/notifications/styles.css";
+import "@mantine/nprogress/styles.css";
+import { MantineProvider } from "@mantine/core";
+import { Notifications } from "@mantine/notifications";
+import { NavigationProgress } from "@mantine/nprogress";
 import App from "./App.jsx";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <HeroUIProvider>
-      <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark">
-        <App />
-      </ThemeProvider>
-    </HeroUIProvider>
+    <MantineProvider defaultColorScheme="dark">
+      <Notifications position="top-right" />
+      <NavigationProgress />
+      <App />
+    </MantineProvider>
   </React.StrictMode>
 );
