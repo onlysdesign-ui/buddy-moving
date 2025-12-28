@@ -1,7 +1,7 @@
 :root {
   color-scheme: dark;
   font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-  background: #05070f;
+  background: #050712;
   color: #e2e8f0;
 }
 
@@ -13,34 +13,23 @@
 
 body {
   min-height: 100vh;
-  background: radial-gradient(circle at top, rgba(58, 76, 118, 0.25) 0%, #0b1020 40%, #05070f 100%);
+  background:
+    radial-gradient(1200px circle at 20% 10%, rgba(120, 90, 255, 0.18), transparent 55%),
+    radial-gradient(900px circle at 80% 30%, rgba(0, 190, 255, 0.12), transparent 60%),
+    #050712;
   position: relative;
   overflow-x: hidden;
 }
 
 .app {
-  max-width: 1100px;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 48px 24px 80px;
+  padding: 56px 24px 96px;
   display: flex;
   flex-direction: column;
   gap: 32px;
   position: relative;
   z-index: 1;
-}
-
-.app::before {
-  content: "";
-  position: absolute;
-  top: 140px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(920px, 90%);
-  height: 420px;
-  background: radial-gradient(circle, rgba(59, 130, 246, 0.18), rgba(15, 23, 42, 0));
-  filter: blur(40px);
-  z-index: 0;
-  pointer-events: none;
 }
 
 .hero {
@@ -54,29 +43,31 @@ body {
 .logo {
   width: 72px;
   height: 72px;
+  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.5));
 }
 
 .hero-text h1 {
-  font-size: 2.8rem;
-  letter-spacing: -0.02em;
+  font-size: 3rem;
+  letter-spacing: -0.03em;
+  font-weight: 700;
 }
 
 .hero-text p {
-  color: #94a3b8;
-  margin-top: 6px;
+  color: rgba(226, 232, 240, 0.62);
+  margin-top: 8px;
   font-size: 1.05rem;
 }
 
 .panel {
-  background: rgba(10, 15, 28, 0.88);
-  border: 1px solid rgba(148, 163, 184, 0.08);
-  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 20px;
   padding: 28px;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  box-shadow: 0 30px 60px rgba(2, 8, 23, 0.55);
-  backdrop-filter: blur(18px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
   position: relative;
   z-index: 1;
 }
@@ -92,21 +83,21 @@ body {
   flex-direction: column;
   gap: 8px;
   font-size: 0.9rem;
-  color: #94a3b8;
+  color: rgba(226, 232, 240, 0.65);
 }
 
 .field span {
   font-size: 0.78rem;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(148, 163, 184, 0.85);
+  color: rgba(226, 232, 240, 0.6);
 }
 
 textarea {
   width: 100%;
-  border-radius: 16px;
-  border: 1px solid transparent;
-  background: rgba(15, 23, 42, 0.65);
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.04);
   color: #e2e8f0;
   padding: 16px 18px;
   resize: vertical;
@@ -118,14 +109,14 @@ textarea {
 textarea:focus,
 input:focus {
   outline: none;
-  border-color: rgba(99, 102, 241, 0.35);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-  background: rgba(15, 23, 42, 0.85);
+  border-color: rgba(96, 165, 250, 0.45);
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 textarea::placeholder,
 input::placeholder {
-  color: rgba(148, 163, 184, 0.6);
+  color: rgba(226, 232, 240, 0.4);
 }
 
 .actions {
@@ -135,12 +126,12 @@ input::placeholder {
 }
 
 .primary {
-  background: linear-gradient(135deg, #60a5fa, #818cf8);
+  background: linear-gradient(135deg, #60a5fa, #7c3aed);
   color: #0b1120;
   border: none;
   border-radius: 14px;
   padding: 0 32px;
-  min-height: 46px;
+  min-height: 48px;
   font-weight: 600;
   font-size: 1.05rem;
   cursor: pointer;
@@ -148,18 +139,18 @@ input::placeholder {
   align-items: center;
   justify-content: center;
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-  box-shadow: 0 16px 30px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 14px 32px rgba(79, 70, 229, 0.35);
 }
 
 .primary:hover {
   transform: translateY(-1px);
-  filter: brightness(1.05);
-  box-shadow: 0 18px 32px rgba(59, 130, 246, 0.3);
+  filter: brightness(1.08);
+  box-shadow: 0 18px 36px rgba(96, 165, 250, 0.4);
 }
 
 .primary:active {
   transform: translateY(0);
-  box-shadow: 0 12px 24px rgba(59, 130, 246, 0.22);
+  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.3);
 }
 
 .primary:disabled {
@@ -173,7 +164,7 @@ input::placeholder {
   align-items: center;
   gap: 10px;
   font-size: 0.95rem;
-  color: #94a3b8;
+  color: rgba(226, 232, 240, 0.6);
 }
 
 .status.active {
@@ -183,7 +174,7 @@ input::placeholder {
 .spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(148, 163, 184, 0.4);
+  border: 2px solid rgba(226, 232, 240, 0.25);
   border-top-color: #60a5fa;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -196,21 +187,23 @@ input::placeholder {
 }
 
 .card {
-  background: rgba(11, 16, 30, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 18px;
   padding: 20px;
   min-height: 140px;
-  box-shadow: 0 16px 30px rgba(2, 6, 23, 0.35);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
 }
 
 .card h3 {
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   margin-bottom: 10px;
+  font-weight: 600;
 }
 
 .card p {
-  color: #cbd5f5;
+  color: rgba(226, 232, 240, 0.72);
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -219,8 +212,8 @@ input::placeholder {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: rgba(9, 12, 22, 0.95);
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(10, 14, 24, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 12px 16px;
   border-radius: 12px;
   color: #e2e8f0;
@@ -230,6 +223,7 @@ input::placeholder {
   pointer-events: none;
   max-width: 280px;
   font-size: 0.9rem;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
 }
 
 .toast.show {
