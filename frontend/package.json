@@ -9,15 +9,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@heroui/react": "^2.8.7",
-    "framer-motion": "^12.23.26",
+    "@heroui/react": "^2.7.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
-    "autoprefixer": "^10.4.19",
-    "postcss": "^8.4.38",
+    "@alloc/quick-lru": "file:./packages/quick-lru",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "vite": "^5.4.2"
   }
