@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { HeroUIProvider } from "@heroui/react";
+import "@heroui/react/styles.css";
 import { ThemeProvider } from "next-themes";
 import App from "./App.jsx";
 import "./index.css";
