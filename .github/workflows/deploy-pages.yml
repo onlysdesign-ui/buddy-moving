@@ -30,13 +30,40 @@ jobs:
       - name: Install dependencies
         run: npm --prefix frontend ci
 
+      # --- DEBUG: print npm logs if install/build fails ---
+      - name: Print npm debug logs (if any)
+        if: failure()
+        run: |
+          echo "=== NPM LOGS DIR ==="
+          ls -la /home/runner/.npm/_logs || true
+          echo "=== Latest npm debug log (head+tail) ==="
+          LOG=$(ls -t /home/runner/.npm/_logs/*-debug-0.log 2>/dev/null | head -n 1)
+          echo "Latest: $LOG"
+          if [ -n "$LOG" ]; then
+            echo "--- HEAD (first 200 lines) ---"
+            sed -n '1,200p' "$LOG" || true
+            echo "--- TAIL (last 200 lines) ---"
+            tail -n 200 "$LOG" || true
+          else
+            echo "No npm debug log found."
+          fi
+
+      # --- DEBUG: upload npm logs as artifact on failure ---
+      - name: Upload npm logs artifact
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-logs
+          path: /home/runner/.npm/_logs
+          if-no-files-found: ignore
+
       - name: Build
         run: npm --prefix frontend run build
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist
