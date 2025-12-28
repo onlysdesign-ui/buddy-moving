@@ -29,6 +29,8 @@ npm install
 npm run dev
 ```
 
+**HeroUI + Tailwind setup:** The frontend uses HeroUI default styles via Tailwind. The Tailwind config lives in `frontend/tailwind.config.js` (including the HeroUI plugin), with PostCSS in `frontend/postcss.config.js`, and the Tailwind layers imported from `frontend/src/index.css`.
+
 ## Environment variables
 
 Backend (`backend/.env`):
