@@ -7,6 +7,22 @@ serving a Vite/React frontend.
 
 **Live demo (Render):** https://buddy-moving.onrender.com
 
+## Deploy Frontend to GitHub Pages
+
+**Pages URL:** `https://<your-github-username>.github.io/buddy-moving/`
+
+The Vite base path is set to `/buddy-moving/` for GitHub Pages, so assets and routes load correctly from that subpath.
+
+**Optional backend API base**
+- Set `VITE_API_BASE` at build time if you want Pages to talk to a backend.
+- Example in `.github/workflows/deploy-pages.yml`:
+  ```yaml
+  - name: Build
+    run: npm --prefix frontend run build
+    env:
+      VITE_API_BASE: https://your-backend.example.com
+  ```
+
 ## Local run (frontend + backend)
 
 ```bash

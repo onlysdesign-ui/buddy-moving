@@ -2,6 +2,15 @@ import { useMemo, useState } from "react";
 import { Button, Textarea } from "@heroui/react";
 
 const initialOutput = "Enter a task and click Analyze to see the response.";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+const mockResponse = {
+  summary: "Mock analysis (backend unavailable).",
+  highlights: [
+    "You can deploy the frontend to GitHub Pages right away.",
+    "Configure VITE_API_BASE to point to the backend when ready."
+  ],
+  recommendations: ["Keep tasks concise.", "Add API_BASE for live data."]
+};
 
 export default function App() {
   const [task, setTask] = useState("");
@@ -22,7 +31,7 @@ export default function App() {
     setResult("Loading...");
 
     try {
-      const response = await fetch("/analyze", {
+      const response = await fetch(`${API_BASE}/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -30,11 +39,15 @@ export default function App() {
         body: JSON.stringify({ task, context: "" })
       });
 
+      if (!response.ok) {
+        throw new Error(`Request failed with status ${response.status}.`);
+      }
+
       const data = await response.json();
       setResult(JSON.stringify(data, null, 2));
     } catch (err) {
-      setError(err?.message || "Something went wrong.");
-      setResult(initialOutput);
+      setError("Backend unavailable. Showing mock analysis instead.");
+      setResult(JSON.stringify({ task, ...mockResponse }, null, 2));
     } finally {
       setIsLoading(false);
     }
@@ -44,7 +57,11 @@ export default function App() {
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16">
         <div className="flex flex-col items-center gap-3">
-          <img src="/buddymoving.svg" alt="Buddy Moving" className="h-10 w-auto" />
+          <img
+            src={`${import.meta.env.BASE_URL}buddymoving.svg`}
+            alt="Buddy Moving"
+            className="h-10 w-auto"
+          />
           <p className="text-center text-sm text-slate-400">
             Minimal HeroUI interface for reliable deployments.
           </p>
