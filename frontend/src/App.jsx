@@ -3,38 +3,40 @@ import { Button, Card, CardBody, CardHeader, Textarea } from "@heroui/react";
 
 const initialResults = [
   {
-    title: "Summary",
-    content: "Enter a task and click Analyze to see the response."
+    title: "Audience",
+    items: []
   },
   {
-    title: "Highlight",
-    content: "Identify key constraints or goals for the move."
+    title: "Metrics",
+    items: []
   },
   {
-    title: "Highlight",
-    content: "Capture timing, access, and packing details."
+    title: "Risks",
+    items: []
   },
   {
-    title: "Recommendation",
-    content: "Confirm inventory and special handling items."
+    title: "Questions",
+    items: []
   },
   {
-    title: "Recommendation",
-    content: "Share schedule details with the moving team."
+    title: "Scenarios",
+    items: []
   },
   {
-    title: "Next Step",
-    content: "Connect to the API for live results."
+    title: "Approaches",
+    items: []
   }
 ];
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const mockResponse = {
-  summary: "Mock analysis (backend unavailable).",
-  highlights: [
-    "You can deploy the frontend to GitHub Pages right away.",
-    "Configure VITE_API_BASE to point to the backend when ready."
-  ],
-  recommendations: ["Keep tasks concise.", "Add API_BASE for live data."]
+  analysis: {
+    audience: ["Mock analysis (backend unavailable)."],
+    metrics: ["You can deploy the frontend to GitHub Pages right away."],
+    risks: ["Configure VITE_API_BASE to point to the backend when ready."],
+    questions: ["Keep tasks concise."],
+    scenarios: ["Add API_BASE for live data."],
+    approaches: []
+  }
 };
 
 export default function App() {
@@ -57,7 +59,7 @@ export default function App() {
     setResults(
       initialResults.map((item) => ({
         ...item,
-        content: "Loading..."
+        isLoading: true
       }))
     );
 
@@ -75,10 +77,10 @@ export default function App() {
       }
 
       const data = await response.json();
-      setResults(buildCards(task, context, data));
+      setResults(buildCards(normalizeAnalysis(data)));
     } catch (err) {
       setError("Backend unavailable. Showing mock analysis instead.");
-      setResults(buildCards(task, context, mockResponse));
+      setResults(buildCards(normalizeAnalysis(mockResponse)));
     } finally {
       setIsLoading(false);
     }
@@ -151,7 +153,17 @@ export default function App() {
                 <p className="text-sm font-medium text-default-500">{item.title}</p>
               </CardHeader>
               <CardBody>
-                <p className="text-sm text-default-700">{item.content}</p>
+                {item.isLoading ? (
+                  <p className="text-sm text-default-700">Loading...</p>
+                ) : item.items.length > 0 ? (
+                  <ul className="list-disc space-y-1 pl-5 text-sm text-default-700">
+                    {item.items.map((entry, entryIndex) => (
+                      <li key={`${item.title}-${entryIndex}`}>{entry}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-default-700">No details yet.</p>
+                )}
               </CardBody>
             </Card>
           ))}
@@ -161,36 +173,43 @@ export default function App() {
   );
 }
 
-function buildCards(task, context, data) {
-  const highlights = Array.isArray(data?.highlights) ? data.highlights : [];
-  const recommendations = Array.isArray(data?.recommendations) ? data.recommendations : [];
-
+function buildCards(analysis) {
   return [
     {
-      title: "Summary",
-      content: data?.summary || "No summary returned yet."
+      title: "Audience",
+      items: analysis.audience
     },
     {
-      title: "Highlight",
-      content: highlights[0] || "Share a key detail about the move."
+      title: "Metrics",
+      items: analysis.metrics
     },
     {
-      title: "Highlight",
-      content: highlights[1] || "Capture access, timing, or inventory details."
+      title: "Risks",
+      items: analysis.risks
     },
     {
-      title: "Recommendation",
-      content: recommendations[0] || "Clarify special handling requirements."
+      title: "Questions",
+      items: analysis.questions
     },
     {
-      title: "Recommendation",
-      content: recommendations[1] || "Confirm the schedule and team availability."
+      title: "Scenarios",
+      items: analysis.scenarios
     },
     {
-      title: "Next Step",
-      content: `Task: ${task || "Add a task to get started."}${
-        context ? ` • Context: ${context}` : ""
-      }`
+      title: "Approaches",
+      items: analysis.approaches
     }
   ];
+}
+
+function normalizeAnalysis(data) {
+  const analysis = data?.analysis ?? {};
+  return {
+    audience: Array.isArray(analysis.audience) ? analysis.audience : [],
+    metrics: Array.isArray(analysis.metrics) ? analysis.metrics : [],
+    risks: Array.isArray(analysis.risks) ? analysis.risks : [],
+    questions: Array.isArray(analysis.questions) ? analysis.questions : [],
+    scenarios: Array.isArray(analysis.scenarios) ? analysis.scenarios : [],
+    approaches: Array.isArray(analysis.approaches) ? analysis.approaches : []
+  };
 }
