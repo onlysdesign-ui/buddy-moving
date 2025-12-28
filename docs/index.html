@@ -1,64 +1,79 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BuddyMoving</title>
-    <link rel="stylesheet" href="/buddy-moving/assets/index.css" />
+    <title>Buddy Moving Analysis</title>
+    <base href="/buddy-moving/" />
+    <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <div id="app">
+    <div class="app">
       <header class="hero">
-        <h1>BuddyMoving</h1>
-        <p>Lightweight AI analysis for product, research, and growth teams.</p>
+        <img class="logo" src="assets/logo.svg" alt="Buddy Moving logo" />
+        <div class="hero-text">
+          <h1>Buddy Moving</h1>
+          <p>Fast, focused analysis for moving tasks, risks, and scenarios.</p>
+        </div>
       </header>
 
-      <section class="card">
-        <label for="task">Task</label>
-        <textarea id="task" placeholder="Describe the task or feature you want to analyze"></textarea>
-
-        <label for="context">Context</label>
-        <textarea id="context" placeholder="Share context, constraints, or goals"></textarea>
+      <section class="panel">
+        <div class="inputs">
+          <label class="field">
+            <span>Task</span>
+            <textarea id="task" rows="4" placeholder="Describe the moving task you need help with..."></textarea>
+          </label>
+          <label class="field">
+            <span>Context</span>
+            <textarea id="context" rows="4" placeholder="Add constraints, timeline, budget, or other context..."></textarea>
+          </label>
+        </div>
 
         <div class="actions">
-          <div id="loading" class="spinner" hidden></div>
-          <button id="analyze-button" type="button">Analyze</button>
+          <button id="analyze" class="primary">Analyze</button>
+          <div class="status" id="status">
+            <span class="spinner" aria-hidden="true"></span>
+            <span class="status-text">Analyzing…</span>
+          </div>
+        </div>
+
+        <div class="settings">
+          <span>API Base</span>
+          <input id="api-base" type="url" placeholder="https://buddy-moving.onrender.com" />
+          <button id="save-api" class="ghost">Save</button>
         </div>
       </section>
 
-      <div id="error" class="callout" hidden>
-        <strong>Something went wrong</strong>
-        <span id="error-message"></span>
-      </div>
-
-      <section class="grid">
-        <article class="card" data-section="audience">
-          <h2>Audience</h2>
-          <div class="content"></div>
-        </article>
-        <article class="card" data-section="metrics">
-          <h2>Metrics</h2>
-          <div class="content"></div>
-        </article>
-        <article class="card" data-section="risks">
-          <h2>Risks</h2>
-          <div class="content"></div>
-        </article>
-        <article class="card" data-section="questions">
-          <h2>Questions</h2>
-          <div class="content"></div>
-        </article>
-        <article class="card" data-section="scenarios">
-          <h2>Scenarios</h2>
-          <div class="content"></div>
-        </article>
-        <article class="card" data-section="approaches">
-          <h2>Approaches</h2>
-          <div class="content"></div>
-        </article>
+      <section class="results">
+        <div class="card">
+          <h3>Audience</h3>
+          <p id="audience">No details yet.</p>
+        </div>
+        <div class="card">
+          <h3>Metrics</h3>
+          <p id="metrics">No details yet.</p>
+        </div>
+        <div class="card">
+          <h3>Risks</h3>
+          <p id="risks">No details yet.</p>
+        </div>
+        <div class="card">
+          <h3>Questions</h3>
+          <p id="questions">No details yet.</p>
+        </div>
+        <div class="card">
+          <h3>Scenarios</h3>
+          <p id="scenarios">No details yet.</p>
+        </div>
+        <div class="card">
+          <h3>Approaches</h3>
+          <p id="approaches">No details yet.</p>
+        </div>
       </section>
     </div>
 
-    <script type="module" src="/buddy-moving/assets/index.js"></script>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script src="app.js"></script>
   </body>
 </html>
