@@ -1,21 +1,20 @@
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
-const { execFile } = require("child_process");
 const dotenv = require("dotenv");
+const OpenAI = require("openai");
 
 dotenv.config({ path: path.join(__dirname, ".env") });
 
-const AI_BASE_URL = process.env.AI_BASE_URL;
-const AI_API_KEY = process.env.AI_API_KEY;
-const AI_MODEL = process.env.AI_MODEL || "gpt-4o-mini";
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const openaiClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 const app = express();
 const port = process.env.PORT || 3000;
 
-console.log("AI_BASE_URL:", AI_BASE_URL ? "set" : "missing");
-console.log("AI_API_KEY:", AI_API_KEY ? "set" : "missing");
-console.log("AI_MODEL:", AI_MODEL);
+console.log("OPENAI_API_KEY:", OPENAI_API_KEY ? "set" : "missing");
+console.log("OPENAI_MODEL:", OPENAI_MODEL);
 
 app.use(express.json());
 
@@ -33,76 +32,46 @@ if (!fs.existsSync(indexPath)) {
 
 app.use(express.static(distPath));
 
-const mockAnalysis = {
-  analysis: {
-    audience: ["New users", "Returning users"],
-    metrics: ["Activation rate", "Conversion rate", "Retention"],
-    risks: ["Unclear success metric", "Edge cases not covered"],
-    questions: ["What is the primary user goal?", "What is the success metric?"],
-    scenarios: ["User opens app → sees onboarding → completes key action"],
-    approaches: [
-      "Simplify the flow and reduce steps",
-      "Add contextual hints and progressive disclosure",
-      "A/B test variants and track key metrics",
-    ],
-  },
-};
+const requiredAnalysisKeys = [
+  "audience",
+  "metrics",
+  "risks",
+  "questions",
+  "scenarios",
+  "approaches",
+];
 
-function callGatewayWithCurl({ baseURL, apiKey, model, messages }) {
-  const url = `${baseURL}/chat/completions`;
-  const payload = JSON.stringify({ model, messages, temperature: 0.2 });
+function parseAnalysisResponse(content) {
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch (error) {
+    throw new Error("Failed to parse OpenAI JSON response");
+  }
 
-  const runOnce = () =>
-    new Promise((resolve, reject) => {
-      const args = [
-        "-sS",
-        "--max-time", "30",
-        "-X", "POST", url,
-        "-H", "Content-Type: application/json",
-        "-H", `Authorization: Bearer ${apiKey}`,
-        "-H", "Accept: application/json",
-        "-H", "User-Agent: BuddyMoving/1.0",
-        "--data", payload,
-      ];
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("OpenAI response was not a JSON object");
+  }
 
-      execFile("curl", args, { maxBuffer: 1024 * 1024 * 5 }, (err, stdout, stderr) => {
-        if (err) return reject(new Error(stderr || err.message));
+  const analysis = {};
 
-        // Cloudflare challenge = HTML
-        if (stdout.includes("<!DOCTYPE html") || stdout.includes("Just a moment") || stdout.includes("__cf_chl")) {
-          return reject(new Error("Cloudflare challenge"));
-        }
-
-        try {
-          resolve(JSON.parse(stdout));
-        } catch (e) {
-          reject(new Error("Failed to parse JSON: " + stdout.slice(0, 200)));
-        }
-      });
-    });
-
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-
-  return (async () => {
-    let lastErr;
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      try {
-        if (attempt > 1) await sleep(700 * attempt);
-        return await runOnce();
-      } catch (e) {
-        lastErr = e;
-      }
+  for (const key of requiredAnalysisKeys) {
+    const value = parsed[key];
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw new Error(`OpenAI response missing or invalid field: ${key}`);
     }
-    throw lastErr;
-  })();
+    analysis[key] = value.trim();
+  }
+
+  return analysis;
 }
 
 
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
-    ai: Boolean(AI_BASE_URL && AI_API_KEY),
-    model: AI_MODEL || null,
+    ai: Boolean(openaiClient),
+    model: OPENAI_MODEL || null,
   });
 });
 
@@ -116,78 +85,40 @@ app.post("/analyze", async (req, res) => {
       return res.status(400).json({ error: "task is required" });
     }
 
-    if (!AI_BASE_URL || !AI_API_KEY) {
+    if (!openaiClient) {
       return res.status(500).json({ error: "AI is not configured (missing env vars)" });
     }
 
-    const prompt = `
-You are a product design copilot.
-Return STRICT JSON with keys:
-audience (array of strings),
-metrics (array of strings),
-risks (array of strings),
-questions (array of strings),
-scenarios (array of strings),
-approaches (array of strings).
+    const prompt = [
+      "You are a product design copilot.",
+      "Return STRICT JSON only.",
+      "Keys: audience, metrics, risks, questions, scenarios, approaches.",
+      "Each value must be a concise string (not a list).",
+      "No markdown, no backticks, no explanations.",
+      "",
+      `Task: ${task}`,
+      `Context: ${context || "(none)"}`,
+    ].join("\n");
 
-Rules:
-- Output must be valid JSON only.
-- No markdown, no backticks, no explanations.
-
-Task: ${task}
-Context: ${context || "(none)"}
-`.trim();
-
-    // --- CALL GATEWAY VIA CURL (avoids Cloudflare blocking Node fetch) ---
-    const data = await callGatewayWithCurl({
-      baseURL: AI_BASE_URL,
-      apiKey: AI_API_KEY,
-      model: AI_MODEL,
+    const data = await openaiClient.chat.completions.create({
+      model: OPENAI_MODEL,
       messages: [{ role: "user", content: prompt }],
+      temperature: 0.4,
+      max_tokens: 600,
+      response_format: { type: "json_object" },
     });
 
-    const content = data?.choices?.[0]?.message?.content || "";
-
-    // Some models sometimes wrap JSON in ```json ...```
-    const cleaned = content
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/```$/i, "")
-      .trim();
-
-    let parsed;
-    try {
-      parsed = JSON.parse(cleaned);
-    } catch (e) {
-      // Return safe structure so frontend never breaks
-      return res.json({
-        analysis: {
-          ...mockAnalysis.analysis,
-          raw: content,
-        },
-      });
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content) {
+      throw new Error("OpenAI response was empty");
     }
 
-    // Ensure required keys exist (defensive)
-    const analysis = {
-      audience: Array.isArray(parsed.audience) ? parsed.audience : [],
-      metrics: Array.isArray(parsed.metrics) ? parsed.metrics : [],
-      risks: Array.isArray(parsed.risks) ? parsed.risks : [],
-      questions: Array.isArray(parsed.questions) ? parsed.questions : [],
-      scenarios: Array.isArray(parsed.scenarios) ? parsed.scenarios : [],
-      approaches: Array.isArray(parsed.approaches) ? parsed.approaches : [],
-    };
+    const analysis = parseAnalysisResponse(content);
 
     return res.json({ analysis });
   } catch (err) {
-    console.error("AI analyze error:", err?.message || err);
-    // Don't break frontend
-    return res.status(200).json({
-      analysis: {
-        ...mockAnalysis.analysis,
-        error: String(err?.message || err),
-      },
-    });
+    console.error("OpenAI request failed:", err);
+    return res.status(500).json({ error: "OpenAI request failed" });
   }
 });
 
