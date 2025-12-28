@@ -1,8 +1,8 @@
 :root {
   color-scheme: dark;
   font-family: "Inter", "Segoe UI", system-ui, sans-serif;
-  background: #050712;
-  color: #e2e8f0;
+  background: #111315;
+  color: #e6e6e6;
 }
 
 * {
@@ -13,12 +13,8 @@
 
 body {
   min-height: 100vh;
-  background:
-    radial-gradient(1200px circle at 20% 10%, rgba(120, 90, 255, 0.18), transparent 55%),
-    radial-gradient(900px circle at 80% 30%, rgba(0, 190, 255, 0.12), transparent 60%),
-    #050712;
-  position: relative;
-  overflow-x: hidden;
+  background: #111315;
+  color: #e6e6e6;
 }
 
 .app {
@@ -36,14 +32,11 @@ body {
   display: flex;
   align-items: center;
   gap: 20px;
-  position: relative;
-  z-index: 1;
 }
 
 .logo {
   width: 72px;
   height: 72px;
-  filter: drop-shadow(0 12px 24px rgba(15, 23, 42, 0.5));
 }
 
 .hero-text h1 {
@@ -53,23 +46,18 @@ body {
 }
 
 .hero-text p {
-  color: rgba(226, 232, 240, 0.62);
+  color: #9aa0a6;
   margin-top: 8px;
   font-size: 1.05rem;
 }
 
 .panel {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 20px;
+  background: #16181a;
+  border-radius: 18px;
   padding: 28px;
   display: flex;
   flex-direction: column;
   gap: 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(12px);
-  position: relative;
-  z-index: 1;
 }
 
 .inputs {
@@ -83,40 +71,38 @@ body {
   flex-direction: column;
   gap: 8px;
   font-size: 0.9rem;
-  color: rgba(226, 232, 240, 0.65);
+  color: #9aa0a6;
 }
 
 .field span {
   font-size: 0.78rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(226, 232, 240, 0.6);
+  color: #9aa0a6;
 }
 
 textarea {
   width: 100%;
-  border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(255, 255, 255, 0.04);
-  color: #e2e8f0;
+  border-radius: 10px;
+  border: none;
+  background: #1b1d1f;
+  color: #e6e6e6;
   padding: 16px 18px;
   resize: vertical;
   min-height: 120px;
   line-height: 1.5;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 textarea:focus,
 input:focus {
   outline: none;
-  border-color: rgba(96, 165, 250, 0.45);
-  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.25);
-  background: rgba(255, 255, 255, 0.06);
+  background: #202326;
 }
 
 textarea::placeholder,
 input::placeholder {
-  color: rgba(226, 232, 240, 0.4);
+  color: #80868b;
 }
 
 .actions {
@@ -126,10 +112,10 @@ input::placeholder {
 }
 
 .primary {
-  background: linear-gradient(135deg, #60a5fa, #7c3aed);
-  color: #0b1120;
+  background: #2b3034;
+  color: #e6e6e6;
   border: none;
-  border-radius: 14px;
+  border-radius: 10px;
   padding: 0 32px;
   min-height: 48px;
   font-weight: 600;
@@ -138,25 +124,20 @@ input::placeholder {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
-  box-shadow: 0 14px 32px rgba(79, 70, 229, 0.35);
+  transition: background 0.2s ease;
 }
 
 .primary:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.08);
-  box-shadow: 0 18px 36px rgba(96, 165, 250, 0.4);
+  background: #343a40;
 }
 
 .primary:active {
-  transform: translateY(0);
-  box-shadow: 0 12px 24px rgba(79, 70, 229, 0.3);
+  background: #262a2d;
 }
 
 .primary:disabled {
   cursor: not-allowed;
   opacity: 0.6;
-  box-shadow: none;
 }
 
 .status {
@@ -164,7 +145,7 @@ input::placeholder {
   align-items: center;
   gap: 10px;
   font-size: 0.95rem;
-  color: rgba(226, 232, 240, 0.6);
+  color: #9aa0a6;
 }
 
 .status.active {
@@ -174,8 +155,8 @@ input::placeholder {
 .spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(226, 232, 240, 0.25);
-  border-top-color: #60a5fa;
+  border: 2px solid rgba(154, 160, 166, 0.35);
+  border-top-color: #c9cdd1;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -187,13 +168,10 @@ input::placeholder {
 }
 
 .card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 18px;
+  background: #16181a;
+  border-radius: 16px;
   padding: 20px;
   min-height: 140px;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
-  backdrop-filter: blur(10px);
 }
 
 .card h3 {
@@ -203,7 +181,7 @@ input::placeholder {
 }
 
 .card p {
-  color: rgba(226, 232, 240, 0.72);
+  color: #c7ccd1;
   line-height: 1.5;
   white-space: pre-wrap;
 }
@@ -212,18 +190,17 @@ input::placeholder {
   position: fixed;
   bottom: 24px;
   right: 24px;
-  background: rgba(10, 14, 24, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #16181a;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 12px 16px;
   border-radius: 12px;
-  color: #e2e8f0;
+  color: #e6e6e6;
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.2s ease, transform 0.2s ease;
   pointer-events: none;
   max-width: 280px;
   font-size: 0.9rem;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
 }
 
 .toast.show {
@@ -232,8 +209,8 @@ input::placeholder {
 }
 
 .toast.error {
-  border-color: rgba(248, 113, 113, 0.6);
-  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #f3b4b4;
 }
 
 @keyframes spin {
