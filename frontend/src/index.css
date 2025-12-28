@@ -2,94 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  :root {
-    color-scheme: dark;
-    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-  }
-
-  * {
-    box-sizing: border-box;
-  }
-
-  body {
-    margin: 0;
-    min-height: 100vh;
-    background: #0b0c10;
-  }
+:root {
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
 }
 
-@layer components {
-  .page {
-    min-height: 100vh;
-    padding: 48px 20px 80px;
-  }
-
-  .app-shell {
-    max-width: 1040px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 28px;
-  }
-
-  .app-header {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .logo-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-  }
-
-  .logo-button img {
-    height: 64px;
-    width: auto;
-  }
-
-  .subtitle {
-    margin: 0;
-  }
-
-  .actions-row {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 12px;
-  }
-
-  .results-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    gap: 20px;
-  }
-
-  @media (min-width: 720px) {
-    .actions-row {
-      flex-direction: row;
-      align-items: center;
-    }
-
-    .actions-row button {
-      flex: 0 0 auto;
-      min-width: 220px;
-    }
-  }
-
-  @media (max-width: 720px) {
-    .page {
-      padding: 32px 16px 64px;
-    }
-
-    .logo-button img {
-      height: 52px;
-    }
-  }
+body {
+  margin: 0;
 }

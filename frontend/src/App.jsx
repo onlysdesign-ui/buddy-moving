@@ -1,218 +1,75 @@
-import { useEffect, useState } from "react";
-import {
-  Button,
-  Card,
-  CardBody,
-  CardHeader,
-  Chip,
-  Spacer,
-  Textarea
-} from "@heroui/react";
+import { useMemo, useState } from "react";
+import { Button, Textarea } from "@heroui/react";
 
-const sectionLabels = {
-  audience: "Audience",
-  metrics: "Metrics",
-  risks: "Risks",
-  questions: "Questions",
-  scenarios: "Scenarios",
-  approaches: "Approaches"
-};
+const initialOutput = "Enter a task and click Analyze to see the response.";
 
-const sectionOrder = [
-  "audience",
-  "metrics",
-  "risks",
-  "questions",
-  "scenarios",
-  "approaches"
-];
-
-const renderContent = (value) => {
-  if (!value) {
-    return <p>No details yet.</p>;
-  }
-
-  if (Array.isArray(value)) {
-    return (
-      <ul>
-        {value.map((item, index) => (
-          <li key={`${item}-${index}`}>{item}</li>
-        ))}
-      </ul>
-    );
-  }
-
-  if (typeof value === "object") {
-    return (
-      <div>
-        {Object.entries(value).map(([key, entry]) => (
-          <p key={key}>
-            <strong>{key}:</strong> {String(entry)}
-          </p>
-        ))}
-      </div>
-    );
-  }
-
-  return <p>{String(value)}</p>;
-};
-
-function App() {
+export default function App() {
   const [task, setTask] = useState("");
-  const [context, setContext] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState(initialOutput);
   const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
-  const [toast, setToast] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const apiBase = import.meta.env.VITE_API_BASE || window.location.origin;
-
-  useEffect(() => {
-    if (!toast) {
-      return undefined;
-    }
-
-    const timer = setTimeout(() => setToast(null), 3500);
-    return () => clearTimeout(timer);
-  }, [toast]);
-
-  const handleReset = () => {
-    setTask("");
-    setContext("");
-    setResult(null);
-    setError("");
-    setLoading(false);
-    setToast(null);
-  };
+  const canSubmit = useMemo(() => task.trim().length > 0 && !isLoading, [task, isLoading]);
 
   const handleAnalyze = async () => {
-    setError("");
-    setResult(null);
-    setToast(null);
-
     if (!task.trim()) {
-      setError("Please describe the task before analyzing.");
-      setToast({ message: "Add a task description to analyze.", tone: "warning" });
+      setError("Please enter a task to analyze.");
       return;
     }
 
-    setLoading(true);
+    setIsLoading(true);
+    setError("");
+    setResult("Loading...");
 
     try {
-      const response = await fetch(`${apiBase}/analyze`, {
+      const response = await fetch("/analyze", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ task, context })
+        body: JSON.stringify({ task, context: "" })
       });
 
-      if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}.`);
-      }
-
       const data = await response.json();
-      setResult(data?.analysis ?? data);
-      setToast({ message: "Analysis complete.", tone: "success" });
+      setResult(JSON.stringify(data, null, 2));
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong.";
-      setError(message);
-      setToast({ message, tone: "danger" });
+      setError(err?.message || "Something went wrong.");
+      setResult(initialOutput);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="page">
-      <div className="app-shell">
-        <header className="app-header">
-          <button
-            type="button"
-            onClick={handleReset}
-            aria-label="Reset BuddyMoving"
-            className="logo-button"
-          >
-            <img src="/buddymoving.svg" alt="BuddyMoving" />
-          </button>
-          <p className="subtitle">
-            Product-design copilot for smarter product decisions.
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col items-center justify-center gap-6 px-6 py-16">
+        <div className="flex flex-col items-center gap-3">
+          <img src="/buddymoving.svg" alt="Buddy Moving" className="h-10 w-auto" />
+          <p className="text-center text-sm text-slate-400">
+            Minimal HeroUI interface for reliable deployments.
           </p>
-        </header>
+        </div>
 
-        <Card shadow="sm">
-          <CardBody>
-            <Textarea
-              label="Task"
-              labelPlacement="outside"
-              placeholder="Describe the task or feature you want to analyze"
-              value={task}
-              onValueChange={setTask}
-              minRows={6}
-              size="lg"
-              variant="flat"
-            />
-            <Spacer y={4} />
-            <Textarea
-              label="Context"
-              labelPlacement="outside"
-              placeholder="Share context, constraints, or goals"
-              value={context}
-              onValueChange={setContext}
-              minRows={6}
-              size="lg"
-              variant="flat"
-            />
-            <Spacer y={4} />
-            <div className="actions-row">
-              <Button
-                size="lg"
-                color="primary"
-                onPress={handleAnalyze}
-                isLoading={loading}
-                isDisabled={loading}
-                fullWidth
-              >
-                Analyze
-              </Button>
-              {loading && (
-                <Chip color="primary" variant="flat" size="sm">
-                  Analyzing…
-                </Chip>
-              )}
-              {toast && !loading && (
-                <Chip color={toast.tone} variant="flat" size="sm">
-                  {toast.message}
-                </Chip>
-              )}
-            </div>
-          </CardBody>
-        </Card>
+        <div className="w-full space-y-4 rounded-2xl border border-white/10 bg-white/5 p-6 shadow-lg">
+          <Textarea
+            label="Task"
+            variant="bordered"
+            placeholder="Describe what you want analyzed..."
+            value={task}
+            onChange={(event) => setTask(event.target.value)}
+          />
+          <Button color="primary" onPress={handleAnalyze} isLoading={isLoading} isDisabled={!canSubmit}>
+            Analyze
+          </Button>
+          {error ? (
+            <p className="text-sm text-rose-400">{error}</p>
+          ) : null}
+        </div>
 
-        {error && (
-          <Card shadow="sm">
-            <CardBody>
-              <Chip color="danger" variant="flat" size="sm">
-                {error}
-              </Chip>
-            </CardBody>
-          </Card>
-        )}
-
-        <div className="results-grid">
-          {sectionOrder.map((key) => (
-            <Card key={key} shadow="sm">
-              <CardHeader>
-                <h3>{sectionLabels[key]}</h3>
-              </CardHeader>
-              <CardBody>{renderContent(result?.[key])}</CardBody>
-            </Card>
-          ))}
+        <div className="w-full rounded-2xl border border-white/10 bg-black/40 p-6">
+          <pre className="whitespace-pre-wrap text-xs text-slate-200">{result}</pre>
         </div>
       </div>
     </div>
   );
 }
-
-export default App;
