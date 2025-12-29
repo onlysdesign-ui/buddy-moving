@@ -120,6 +120,7 @@ const keyInstructions = {
     "- Key uncertainties: <1-2 bullets>",
     "- Why this framing (vs another plausible framing): <1-2 bullets>",
     "- Trade-offs of this framing: <1-2 bullets>",
+    "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
   ].join("\n"),
   audience_focus: [
     "Output format:",
@@ -147,6 +148,7 @@ const keyInstructions = {
     "- Key uncertainties: <1-2 bullets>",
     "- Why this focus (vs another plausible focus): <1-2 bullets>",
     "- Trade-offs: <1-2 bullets>",
+    "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
   ].join("\n"),
   hypotheses: [
     "Output format:",
@@ -163,6 +165,7 @@ const keyInstructions = {
     "- Rejected: <1-2 bullets + why>",
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
+    "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
   ].join("\n"),
   scenarios: [
     "Output format:",
@@ -170,6 +173,7 @@ const keyInstructions = {
     "1) <scenario name>",
     "- Intent: <1 sentence>",
     "- Entry point: <where/when/how they start>",
+    "- UI touchpoints: <which blocks/components are used>",
     "- Steps:",
     "  1. ...",
     "  2. ...",
@@ -177,6 +181,8 @@ const keyInstructions = {
     "- Success criteria:",
     "  - <2-3 bullets>",
     "- Drop-off risks:",
+    "  - <2-3 bullets>",
+    "- Edge cases:",
     "  - <2-3 bullets>",
     "",
     "(3-5 scenarios)",
@@ -190,6 +196,7 @@ const keyInstructions = {
     "- Rejected: <1-2 bullets + why>",
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
+    "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
   ].join("\n"),
   success_criteria: [
     "Output format:",
@@ -208,12 +215,17 @@ const keyInstructions = {
     "### Guardrails",
     "- <risk to avoid> - How we monitor",
     "",
+    "### Instrumentation notes",
+    "- What events we need: <3-6 events>",
+    "- What we log: <2-4 properties>",
+    "",
     "### Decision trail",
     "- Inputs used: <2-3 bullets from task/context/case file>",
     "- Options considered: <2-3 bullets>",
     "- Rejected: <1-2 bullets + why>",
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
+    "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
   ].join("\n"),
   options: [
     "Output format:",
@@ -233,6 +245,7 @@ const keyInstructions = {
     "  - <2-3 bullets>",
     "- What we will NOT do:",
     "  - <2-3 bullets>",
+    "- Deliverables: screens (3-6), components (5-8), copy (3-5)",
     "",
     "### Option B (alternative)",
     "- What it is: <2 sentences>",
@@ -247,6 +260,7 @@ const keyInstructions = {
     "  - <2-3 bullets>",
     "- What we will NOT do:",
     "  - <2-3 bullets>",
+    "- Deliverables: screens (3-6), components (5-8), copy (3-5)",
     "",
     "### Decision trail",
     "- Inputs used: <2-3 bullets from task/context/case file>",
@@ -254,6 +268,7 @@ const keyInstructions = {
     "- Rejected: <1-2 bullets + why>",
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
+    "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
   ].join("\n"),
   recommendation: [
     "Output format:",
@@ -284,12 +299,24 @@ const keyInstructions = {
     "### If our assumptions are wrong",
     "- <2-3 bullets>",
     "",
+    "### Design blueprint",
+    "- Screens to design (5-8): <name + purpose>",
+    "- Components to design (5-10): <component list>",
+    "- Microcopy (5-10 lines): <CTA + helper text snippets>",
+    "- Edge/empty/error states (3-6): <state + what user sees/does>",
+    "",
+    "### What would change my mind",
+    "- If we learn <X>, then we should switch to <Option B / alternative> because <reason>",
+    "- If constraint <Y> appears, we should simplify to <fallback>",
+    "- If early signals show <Z>, we should pivot to <new direction>",
+    "",
     "### Decision trail",
     "- Inputs used: <2-3 bullets from task/context/case file>",
     "- Options considered: <2-3 bullets>",
     "- Rejected: <1-2 bullets + why>",
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
+    "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
   ].join("\n"),
 };
 
@@ -353,6 +380,8 @@ function buildKeyPrompt({ key, task, context, language, caseFile }) {
     "If information is missing, use Assumption (confidence): ... - Impact: ... - How to validate: ...",
     "Keep output structured with markdown headings starting with '###'.",
     "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
+    "SELF-REVIEW (silent): remove repetition, replace generic claims with concrete UI/mechanism, ensure at least one trade-off and one risk where relevant.",
+    "For design tasks, always include a concrete deliverables list (screens/components/copy) when the key allows it.",
     STRICT_MODE
       ? "ANTI-FLUFF CHECK: If a sentence could fit any product, rewrite it with specifics."
       : null,
@@ -558,6 +587,8 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
                   "NUMBERS RULE: Do NOT invent numeric targets or % deltas. Only use numbers if explicitly provided by the user/context. Otherwise keep it qualitative.",
                   "If info is missing, use Assumption (confidence) + Impact + How to validate (quick).",
                   "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  "SELF-REVIEW (silent): Before you finalize, rewrite any generic or repeated bullets to add concrete UI/mechanism/risk/test. Remove duplication. Ensure every section adds new information.",
+                  "Do NOT output the self-review. Output only the final answer.",
                   STRICT_MODE
                     ? "ANTI-FLUFF: If a sentence could fit any product, rewrite it with specifics (UI, user action, constraint)."
                     : null,
@@ -677,6 +708,8 @@ async function runDeeper({
                   "NUMBERS RULE: Do NOT invent numeric targets or % deltas. Only use numbers if explicitly provided by the user/context. Otherwise keep it qualitative.",
                   "If info is missing, use Assumption (confidence) + Impact + How to validate (quick).",
                   "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  "SELF-REVIEW (silent): Before you finalize, rewrite any generic or repeated bullets to add concrete UI/mechanism/risk/test. Remove duplication. Ensure every section adds new information.",
+                  "Do NOT output the self-review. Output only the final answer.",
                   STRICT_MODE
                     ? "ANTI-FLUFF: If a sentence could fit any product, rewrite it with specifics (UI, user action, constraint)."
                     : null,
@@ -796,6 +829,8 @@ async function runVerify({
                   "NUMBERS RULE: Do NOT invent numeric targets or % deltas. Only use numbers if explicitly provided by the user/context. Otherwise keep it qualitative.",
                   "If info is missing, use Assumption (confidence) + Impact + How to validate (quick).",
                   "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  "SELF-REVIEW (silent): Before you finalize, rewrite any generic or repeated bullets to add concrete UI/mechanism/risk/test. Remove duplication. Ensure every section adds new information.",
+                  "Do NOT output the self-review. Output only the final answer.",
                   STRICT_MODE
                     ? "ANTI-FLUFF: If a sentence could fit any product, rewrite it with specifics (UI, user action, constraint)."
                     : null,
