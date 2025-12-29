@@ -8,6 +8,7 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
+const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 30000;
 const openaiClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 
 const app = express();
@@ -204,23 +205,43 @@ function buildContextSummary(currentAnalysis, keyToSkip) {
   return lines.length ? lines.join("\n") : "(none)";
 }
 
+async function runWithTimeout(fn, { timeoutMs = OPENAI_TIMEOUT_MS, label }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fn(controller.signal);
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`${label || "OpenAI request"} timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 async function runKeyCompletion({ key, task, context, language }) {
   const prompt = buildKeyPrompt({ key, task, context, language });
-  const response = await openaiClient.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [
-      {
-        role: "system",
-        content: [
-          "You are a senior product designer + product strategist.",
-          "Respond with plain text only. No JSON, no markdown headers.",
-        ].join("\n"),
-      },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.4,
-    max_tokens: 450,
-  });
+  const response = await runWithTimeout(
+    (signal) =>
+      openaiClient.chat.completions.create({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: [
+              "You are a senior product designer + product strategist.",
+              "Respond with plain text only. No JSON, no markdown headers.",
+            ].join("\n"),
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.4,
+        max_tokens: 450,
+        signal,
+      }),
+    { label: `OpenAI ${key} request` }
+  );
 
   const content = response?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -257,19 +278,24 @@ async function runDeeper({ key, task, context, language, currentAnalysis }) {
     keyInstructions[key],
   ].join("\n");
 
-  const response = await openaiClient.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [
-      {
-        role: "system",
-        content:
-          "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
-      },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.45,
-    max_tokens: 500,
-  });
+  const response = await runWithTimeout(
+    (signal) =>
+      openaiClient.chat.completions.create({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.45,
+        max_tokens: 500,
+        signal,
+      }),
+    { label: `OpenAI deeper ${key} request` }
+  );
 
   const content = response?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -306,19 +332,24 @@ async function runVerify({ key, task, context, language, currentAnalysis, value 
     keyInstructions[key],
   ].join("\n");
 
-  const response = await openaiClient.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [
-      {
-        role: "system",
-        content:
-          "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
-      },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.45,
-    max_tokens: 500,
-  });
+  const response = await runWithTimeout(
+    (signal) =>
+      openaiClient.chat.completions.create({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: "system",
+            content:
+              "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.45,
+        max_tokens: 500,
+        signal,
+      }),
+    { label: `OpenAI verify ${key} request` }
+  );
 
   const content = response?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -399,15 +430,22 @@ app.post("/analyze/stream", async (req, res) => {
   }
 
   const language = resolveLanguage(`${task} ${context}`);
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
 
   let closed = false;
   req.on("close", () => {
     closed = true;
   });
+
+  const heartbeatId = setInterval(() => {
+    if (!closed) {
+      res.write(": ping\n\n");
+    }
+  }, 12000);
 
   writeSseEvent(res, "status", {
     status: "started",
@@ -416,30 +454,35 @@ app.post("/analyze/stream", async (req, res) => {
   });
 
   let completed = 0;
-  for (const key of analysisKeys) {
-    if (closed) break;
-    try {
-      const value = await runKeyCompletion({ key, task, context, language });
-      completed += 1;
-      writeSseEvent(res, "key", { key, value, status: "ok" });
-      writeSseEvent(res, "status", {
-        status: "progress",
-        completed,
-        total: analysisKeys.length,
-      });
-    } catch (error) {
-      console.error(`OpenAI request failed for ${key}:`, error);
-      writeSseEvent(res, "error", {
-        key,
-        error: "OpenAI request failed",
-        details: error?.message ? String(error.message) : String(error),
-      });
+  try {
+    for (const key of analysisKeys) {
+      if (closed) break;
+      try {
+        const value = await runKeyCompletion({ key, task, context, language });
+        writeSseEvent(res, "key", { key, value, status: "ok" });
+      } catch (error) {
+        console.error(`OpenAI request failed for ${key}:`, error);
+        writeSseEvent(res, "error", {
+          key,
+          error: "OpenAI request failed",
+          details: error?.message ? String(error.message) : String(error),
+        });
+      } finally {
+        if (closed) break;
+        completed += 1;
+        writeSseEvent(res, "status", {
+          status: "progress",
+          completed,
+          total: analysisKeys.length,
+        });
+      }
     }
-  }
-
-  if (!closed) {
-    writeSseEvent(res, "done", { status: "done" });
-    res.end();
+  } finally {
+    clearInterval(heartbeatId);
+    if (!closed) {
+      writeSseEvent(res, "done", { status: "done" });
+      res.end();
+    }
   }
 });
 
