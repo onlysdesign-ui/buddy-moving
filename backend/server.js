@@ -220,28 +220,50 @@ async function runWithTimeout(fn, { timeoutMs = OPENAI_TIMEOUT_MS, label }) {
   }
 }
 
+function logOpenAIError(key, err) {
+  const status = err?.status;
+  const code = err?.code;
+  const message = err?.message;
+  const errorMessage = err?.error?.message;
+  console.error("OpenAI error", {
+    key,
+    status,
+    code,
+    message,
+    errorMessage,
+  });
+}
+
 async function runKeyCompletion({ key, task, context, language }) {
   const prompt = buildKeyPrompt({ key, task, context, language });
-  const response = await runWithTimeout(
-    (signal) =>
-      openaiClient.chat.completions.create({
-        model: OPENAI_MODEL,
-        messages: [
+  let response;
+  try {
+    response = await runWithTimeout(
+      (signal) =>
+        openaiClient.chat.completions.create(
           {
-            role: "system",
-            content: [
-              "You are a senior product designer + product strategist.",
-              "Respond with plain text only. No JSON, no markdown headers.",
-            ].join("\n"),
+            model: OPENAI_MODEL,
+            messages: [
+              {
+                role: "system",
+                content: [
+                  "You are a senior product designer + product strategist.",
+                  "Respond with plain text only. No JSON, no markdown headers.",
+                ].join("\n"),
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.4,
+            max_tokens: 450,
           },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.4,
-        max_tokens: 450,
-        signal,
-      }),
-    { label: `OpenAI ${key} request` }
-  );
+          { signal }
+        ),
+      { label: `OpenAI ${key} request` }
+    );
+  } catch (error) {
+    logOpenAIError(key, error);
+    throw error;
+  }
 
   const content = response?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -278,24 +300,32 @@ async function runDeeper({ key, task, context, language, currentAnalysis }) {
     keyInstructions[key],
   ].join("\n");
 
-  const response = await runWithTimeout(
-    (signal) =>
-      openaiClient.chat.completions.create({
-        model: OPENAI_MODEL,
-        messages: [
+  let response;
+  try {
+    response = await runWithTimeout(
+      (signal) =>
+        openaiClient.chat.completions.create(
           {
-            role: "system",
-            content:
-              "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+            model: OPENAI_MODEL,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.45,
+            max_tokens: 500,
           },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.45,
-        max_tokens: 500,
-        signal,
-      }),
-    { label: `OpenAI deeper ${key} request` }
-  );
+          { signal }
+        ),
+      { label: `OpenAI deeper ${key} request` }
+    );
+  } catch (error) {
+    logOpenAIError(key, error);
+    throw error;
+  }
 
   const content = response?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -332,24 +362,32 @@ async function runVerify({ key, task, context, language, currentAnalysis, value 
     keyInstructions[key],
   ].join("\n");
 
-  const response = await runWithTimeout(
-    (signal) =>
-      openaiClient.chat.completions.create({
-        model: OPENAI_MODEL,
-        messages: [
+  let response;
+  try {
+    response = await runWithTimeout(
+      (signal) =>
+        openaiClient.chat.completions.create(
           {
-            role: "system",
-            content:
-              "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+            model: OPENAI_MODEL,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.45,
+            max_tokens: 500,
           },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.45,
-        max_tokens: 500,
-        signal,
-      }),
-    { label: `OpenAI verify ${key} request` }
-  );
+          { signal }
+        ),
+      { label: `OpenAI verify ${key} request` }
+    );
+  } catch (error) {
+    logOpenAIError(key, error);
+    throw error;
+  }
 
   const content = response?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
