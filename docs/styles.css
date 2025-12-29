@@ -186,16 +186,6 @@ input::placeholder {
   gap: 16px;
 }
 
-.action-row {
-  display: none;
-  gap: 16px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.action-row.visible {
-  display: grid;
-}
-
 .card {
   background: #16181a;
   border-radius: 16px;
@@ -207,38 +197,6 @@ input::placeholder {
 
 .result-card {
   width: 100%;
-}
-
-.action-card {
-  background: #1a1c1f;
-  color: #c7ccd1;
-  border: none;
-  border-radius: 14px;
-  padding: 18px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
-}
-
-.action-card:hover {
-  background: #202327;
-  color: #f1f3f4;
-  transform: translateY(-1px);
-}
-
-.action-card.loading {
-  cursor: wait;
-  color: #9aa0a6;
-}
-
-.action-card.complete {
-  color: #9ee6bf;
-}
-
-.result-card p {
-  flex: 1;
 }
 
 .card-head {
@@ -257,6 +215,53 @@ input::placeholder {
   color: #c7ccd1;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.card-content {
+  flex: 1;
+}
+
+.card-status {
+  color: #9aa0a6;
+  font-size: 0.82rem;
+}
+
+.card-skeleton {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skeleton-line {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #1d2023, #2a2d31, #1d2023);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  opacity: 0.75;
+}
+
+.skeleton-line.line-xl {
+  width: 88%;
+}
+
+.skeleton-line.line-lg {
+  width: 72%;
+}
+
+.skeleton-line.line-md {
+  width: 58%;
+}
+
+.skeleton-line.line-sm {
+  width: 42%;
 }
 
 .card-actions {
@@ -307,9 +312,33 @@ input::placeholder {
   cursor: not-allowed;
 }
 
-.card.loading p {
+.card.loading .card-content {
   color: #8b9197;
   font-style: italic;
+}
+
+.card.skeleton .card-content {
+  display: none;
+}
+
+.card.skeleton .card-skeleton {
+  display: flex;
+}
+
+.card.skeleton .card-status {
+  display: block;
+}
+
+.card-status:empty {
+  display: none;
+}
+
+.card.error {
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.card.error .card-content {
+  color: #f3b4b4;
 }
 
 .card-btn.copied {
@@ -347,6 +376,15 @@ input::placeholder {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
   }
 }
 
