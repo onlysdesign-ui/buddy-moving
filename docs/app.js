@@ -206,28 +206,39 @@ const streamAnalysis = async ({ task, context }) => {
     }
   };
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
+  let streamError = null;
 
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split("\n\n");
-    buffer = events.pop() || "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
 
-    events.forEach((rawEvent) => {
-      const { event, data } = parseSseEvent(rawEvent);
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+
+      events.forEach((rawEvent) => {
+        const { event, data } = parseSseEvent(rawEvent);
+        handleSsePayload(event, data);
+      });
+    }
+
+    if (buffer.trim()) {
+      const { event, data } = parseSseEvent(buffer);
       handleSsePayload(event, data);
-    });
+    }
+  } catch (error) {
+    streamError = error;
+  } finally {
+    if (!sawDone) {
+      finishPendingCards("Failed / no response.");
+      updateProgress(total, total);
+      showToast("Stream ended early. Analysis marked complete.", "error");
+    }
   }
 
-  if (buffer.trim()) {
-    const { event, data } = parseSseEvent(buffer);
-    handleSsePayload(event, data);
-  }
-
-  if (!sawDone) {
-    finishPendingCards("Error: stream ended early.");
-    showToast("Stream ended early. Analysis marked complete.", "error");
+  if (streamError) {
+    throw streamError;
   }
 };
 
