@@ -71,9 +71,9 @@ if (!fs.existsSync(indexPath)) {
 app.use(express.static(distPath));
 
 // ------------------------------
-// OpenAI response parsing
+// Analysis helpers
 // ------------------------------
-const requiredAnalysisKeys = [
+const analysisKeys = [
   "audience",
   "metrics",
   "risks",
@@ -82,66 +82,257 @@ const requiredAnalysisKeys = [
   "approaches",
 ];
 
-function extractJSONObject(text) {
-  if (typeof text !== "string") return null;
+const keyInstructions = {
+  audience: [
+    "Answer: Who is the user and what jobs are they trying to get done?",
+    "- Primary audience (who they are, their environment)",
+    "- Secondary audiences/stakeholders (if relevant)",
+    "- User goals + motivations (what they want to achieve)",
+    "- Pain points and constraints (time, skill, trust, device, context)",
+    "- Segments (2-3 meaningful segments: novice vs expert, B2B vs B2C, etc.)",
+    "- Non-users / excluded groups (who this is NOT for, if that matters)",
+  ].join("\n"),
+  metrics: [
+    "Answer: How do we measure success and whether the solution works?",
+    "- Core success metric (North Star) tied to user value",
+    "- Supporting metrics (behavioral + outcome + quality)",
+    "- Guardrails (avoid making it worse: errors, churn, complaints)",
+    "- Leading indicators (early signals)",
+    "- Instrumentation hints (what needs tracking)",
+    "Rules: Prefer measurable, observable metrics; include baseline/target hints.",
+  ].join("\n"),
+  risks: [
+    "Answer: What can go wrong and what could kill adoption or trust?",
+    "- Product risks (wrong problem, unclear value, poor adoption)",
+    "- UX risks (confusion, cognitive load, edge cases)",
+    "- Trust & safety risks (misleading outputs, hallucinations, bias)",
+    "- Legal/compliance/privacy risks (PII, data retention)",
+    "- Technical risks (latency, reliability, cost)",
+    "- Stakeholder risks (misalignment, scope creep)",
+    "For each risk: state the risk + impact + mitigation idea.",
+  ].join("\n"),
+  questions: [
+    "Answer: What do we need to learn before building or shipping?",
+    "- The most important unknowns (5-10)",
+    "- Questions for user research (needs, behaviors, current workarounds)",
+    "- Questions for feasibility (data, constraints, system behavior)",
+    "- Questions for business (who pays, why now, differentiation)",
+    "- Questions for AI behavior (accuracy, failure modes, acceptable errors)",
+    "Make questions actionable: testable via interviews, prototypes, analytics.",
+  ].join("\n"),
+  scenarios: [
+    "Answer: What are the key user flows and real-life situations we must support?",
+    "- 3-6 scenarios with: Trigger/context, user goal, high-level steps, success outcome,",
+    "  common failure case / edge case.",
+    "- Include at least one: happy path, stressful/urgent path, novice path, edge/failure path.",
+  ].join("\n"),
+  approaches: [
+    "Answer: What are viable solution directions and how would we validate them?",
+    "- 3-5 distinct solution approaches",
+    "- For each: concept in one line, why it might work (insight),",
+    "  what to prototype/test (MVP test), risks/tradeoffs, complexity (low/med/high)",
+    "Ensure approaches are meaningfully different and testable quickly.",
+  ].join("\n"),
+};
 
-  // Иногда бывают невидимые символы в начале
-  const cleaned = text.trim().replace(/^\uFEFF/, "");
+const languageLabels = {
+  en: "English",
+  ru: "Russian",
+};
 
-  const first = cleaned.indexOf("{");
-  const last = cleaned.lastIndexOf("}");
+function detectLanguage(text) {
+  const input = typeof text === "string" ? text : "";
+  const cyrillicMatches = input.match(/[А-Яа-яЁё]/g) || [];
+  const latinMatches = input.match(/[A-Za-z]/g) || [];
+  const cyrillicCount = cyrillicMatches.length;
+  const latinCount = latinMatches.length;
+  const total = cyrillicCount + latinCount;
 
-  if (first === -1 || last === -1 || last <= first) return null;
+  if (total === 0) return "auto";
 
-  return cleaned.slice(first, last + 1);
+  const cyrillicRatio = cyrillicCount / total;
+  if (cyrillicRatio >= 0.6) return "ru";
+  if (cyrillicRatio <= 0.4) return "en";
+  return "auto";
 }
 
-function parseAnalysisResponse(content) {
-  const raw = typeof content === "string" ? content : "";
+function resolveLanguage(text) {
+  const detected = detectLanguage(text);
+  if (detected !== "auto") return detected;
 
-  // 1) Сначала пытаемся парсить как есть
-  try {
-    const parsed = JSON.parse(raw);
-
-    if (!parsed || typeof parsed !== "object") {
-      throw new Error("OpenAI response was not a JSON object");
-    }
-
-    return validateAnalysis(parsed);
-  } catch (e) {
-    // 2) Если не получилось - попробуем вытащить JSON из строки
-    const extracted = extractJSONObject(raw);
-
-    if (!extracted) {
-      // Логируем реальный ответ (обрезаем, чтобы не спамить)
-      console.error("❌ OpenAI returned non-JSON content:", raw.slice(0, 1000));
-      throw new Error("Failed to parse OpenAI JSON response (no JSON object found)");
-    }
-
-    try {
-      const parsed = JSON.parse(extracted);
-      return validateAnalysis(parsed);
-    } catch (e2) {
-      console.error("❌ OpenAI returned broken JSON:", extracted.slice(0, 1000));
-      throw new Error("Failed to parse OpenAI JSON response (broken JSON)");
-    }
-  }
+  const cyrillicCount = (text.match(/[А-Яа-яЁё]/g) || []).length;
+  const latinCount = (text.match(/[A-Za-z]/g) || []).length;
+  if (cyrillicCount > latinCount) return "ru";
+  if (latinCount > cyrillicCount) return "en";
+  return "en";
 }
 
-function validateAnalysis(parsed) {
-  const analysis = {};
+function buildKeyPrompt({ key, task, context, language }) {
+  const languageLabel = languageLabels[language] || "English";
+  return [
+    "You are a senior product designer + product strategist.",
+    `Respond only for the "${key}" section.`,
+    `Write in ${languageLabel}.`,
+    "Use short paragraphs and bullet-like formatting inside the response (use '-' for bullets).",
+    "Avoid vague language; be concrete and actionable.",
+    "",
+    "TASK:",
+    task,
+    "",
+    "CONTEXT:",
+    context || "(none)",
+    "",
+    "KEY SPECIFICATION:",
+    keyInstructions[key],
+  ].join("\n");
+}
 
-  for (const key of requiredAnalysisKeys) {
-    const value = parsed[key];
-
-    if (typeof value !== "string" || value.trim().length === 0) {
-      throw new Error(`OpenAI response missing or invalid field: ${key}`);
-    }
-
-    analysis[key] = value.trim();
+function buildContextSummary(currentAnalysis, keyToSkip) {
+  if (!currentAnalysis || typeof currentAnalysis !== "object") {
+    return "(none)";
   }
 
-  return analysis;
+  const lines = analysisKeys
+    .filter((key) => key !== keyToSkip)
+    .map((key) => {
+      const value = currentAnalysis[key];
+      if (!value || typeof value !== "string") return null;
+      return `${key}: ${value}`;
+    })
+    .filter(Boolean);
+
+  return lines.length ? lines.join("\n") : "(none)";
+}
+
+async function runKeyCompletion({ key, task, context, language }) {
+  const prompt = buildKeyPrompt({ key, task, context, language });
+  const response = await openaiClient.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: [
+          "You are a senior product designer + product strategist.",
+          "Respond with plain text only. No JSON, no markdown headers.",
+        ].join("\n"),
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.4,
+    max_tokens: 450,
+  });
+
+  const content = response?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string") {
+    console.error("❌ OpenAI returned empty content for key:", key);
+    throw new Error("OpenAI response was empty");
+  }
+
+  return content.trim();
+}
+
+async function runDeeper({ key, task, context, language, currentAnalysis }) {
+  const otherContext = buildContextSummary(currentAnalysis, key);
+  const prompt = [
+    "You are a senior product designer + product strategist.",
+    `Write a deeper, more detailed version of the "${key}" analysis.`,
+    `Write in ${languageLabels[language] || "English"}.`,
+    "Stay consistent with the current analysis for the other keys.",
+    "Use short paragraphs and bullet-like formatting (use '-' for bullets).",
+    "Avoid vague abstractions; be concrete and actionable.",
+    "",
+    "TASK:",
+    task,
+    "",
+    "CONTEXT:",
+    context || "(none)",
+    "",
+    "CURRENT ANALYSIS FOR OTHER KEYS:",
+    otherContext,
+    "",
+    "CURRENT VERSION TO EXPAND:",
+    currentAnalysis?.[key] || "(none)",
+    "",
+    "KEY SPECIFICATION:",
+    keyInstructions[key],
+  ].join("\n");
+
+  const response = await openaiClient.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.45,
+    max_tokens: 500,
+  });
+
+  const content = response?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string") {
+    console.error("❌ OpenAI returned empty content for deeper:", key);
+    throw new Error("OpenAI response was empty");
+  }
+
+  return content.trim();
+}
+
+async function runVerify({ key, task, context, language, currentAnalysis, value }) {
+  const otherContext = buildContextSummary(currentAnalysis, key);
+  const prompt = [
+    "You are a senior product designer + product strategist.",
+    `Rewrite the "${key}" analysis to be more realistic and grounded.`,
+    `Write in ${languageLabels[language] || "English"}.`,
+    "Re-check realism, remove abstractions, add concrete constraints and assumptions.",
+    "Use short paragraphs and bullet-like formatting (use '-' for bullets).",
+    "Stay consistent with the other keys.",
+    "",
+    "TASK:",
+    task,
+    "",
+    "CONTEXT:",
+    context || "(none)",
+    "",
+    "CURRENT ANALYSIS FOR OTHER KEYS:",
+    otherContext,
+    "",
+    "CURRENT VALUE TO REWRITE:",
+    value || currentAnalysis?.[key] || "(none)",
+    "",
+    "KEY SPECIFICATION:",
+    keyInstructions[key],
+  ].join("\n");
+
+  const response = await openaiClient.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content:
+          "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.45,
+    max_tokens: 500,
+  });
+
+  const content = response?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string") {
+    console.error("❌ OpenAI returned empty content for verify:", key);
+    throw new Error("OpenAI response was empty");
+  }
+
+  return content.trim();
+}
+
+function writeSseEvent(res, event, data) {
+  const payload = typeof data === "string" ? data : JSON.stringify(data);
+  res.write(`event: ${event}\n`);
+  res.write(`data: ${payload}\n\n`);
 }
 
 
@@ -172,140 +363,170 @@ app.post("/analyze", async (req, res) => {
         .json({ error: "AI is not configured (missing env vars)" });
     }
 
-const prompt = `
-You are a senior product designer + product strategist.
+    const language = resolveLanguage(`${task} ${context}`);
+    const analysis = {};
 
-Your job: help a designer quickly understand a task, uncover user intent, define success, identify risks, and propose research-ready approaches.
-
-Return STRICT JSON only.
-No markdown, no backticks, no explanations outside JSON.
-
-IMPORTANT OUTPUT RULES:
-- Output must be a single JSON object with EXACT keys:
-  audience, metrics, risks, questions, scenarios, approaches
-- Each value MUST be a concise, information-dense string.
-- Use short paragraphs and bullet-like formatting inside the string (using "-" for bullets).
-- Avoid vague language ("improve UX", "make it better"). Be concrete.
-- Think like a designer preparing discovery + solution framing.
-
-CONTEXT:
-Task: ${task}
-Context: ${context || "(none)"}
-
-KEY SPECIFICATION (what each key MUST answer):
-
-1) audience
-Answer: "Who is the user and what jobs are they trying to get done?"
-Include:
-- Primary audience (who they are, their environment)
-- Secondary audiences/stakeholders (if relevant)
-- User goals + motivations (what they want to achieve)
-- Pain points and constraints (time, skill, trust, device, context)
-- Segments (2-3 meaningful segments: novice vs expert, B2B vs B2C, etc.)
-- Non-users / excluded groups (who this is NOT for, if that matters)
-
-2) metrics
-Answer: "How do we measure success and whether the solution works?"
-Include:
-- Core success metric (North Star) tied to user value
-- Supporting metrics (behavioral + outcome + quality)
-- Guardrails (to avoid making it worse: errors, churn, complaints)
-- Leading indicators (early signals)
-- Instrumentation hints (what needs tracking)
-
-Rules:
-- Prefer measurable, observable metrics.
-- Include baseline/target hints if possible (even qualitative targets).
-
-3) risks
-Answer: "What can go wrong and what could kill adoption or trust?"
-Include:
-- Product risks (wrong problem, unclear value, poor adoption)
-- UX risks (confusion, cognitive load, edge cases)
-- Trust & safety risks (misleading outputs, hallucinations, bias)
-- Legal/compliance/privacy risks (PII, data retention)
-- Technical risks (latency, reliability, cost)
-- Stakeholder risks (misalignment, scope creep)
-
-For each risk: state the risk + impact + mitigation idea.
-
-4) questions
-Answer: "What do we need to learn before building or shipping?"
-Include:
-- The most important unknowns (5-10)
-- Questions for user research (needs, behaviors, current workarounds)
-- Questions for feasibility (data, constraints, system behavior)
-- Questions for business (who pays, why now, differentiation)
-- Questions for AI behavior (accuracy, failure modes, acceptable errors)
-
-Make questions actionable: they should be testable via interviews, prototypes, or analytics.
-
-5) scenarios
-Answer: "What are the key user flows and real-life situations we must support?"
-Include:
-- 3-6 scenarios with:
-  - Trigger/context
-  - User goal
-  - Steps at a high level
-  - Success outcome
-  - Common failure case / edge case
-- Include at least one:
-  - happy path
-  - stressful/urgent path
-  - novice path
-  - edge/failure path
-
-6) approaches
-Answer: "What are viable solution directions and how would we validate them?"
-Include:
-- 3-5 distinct solution approaches
-- For each approach:
-  - Concept in one line
-  - Why it might work (insight)
-  - What to prototype/test (MVP test)
-  - Risks/tradeoffs
-  - Complexity estimate (low/med/high)
-
-Ensure approaches are meaningfully different (not just UI variations).
-Prefer approaches that are testable quickly with prototypes.
-
-Now produce the JSON object.
-`.trim();
-
-   const data = await openaiClient.chat.completions.create({
-    model: OPENAI_MODEL,
-    messages: [
-      {
-        role: "system",
-        content: [
-          "You are a senior product designer + product strategist.",
-          "Return STRICT JSON only. No markdown, no prose.",
-          "Output must be a single JSON object with keys:",
-          "audience, metrics, risks, questions, scenarios, approaches.",
-          "Each value must be a concise string."
-        ].join("\n")
-      },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.4,
-    max_tokens: 700,
-    response_format: { type: "json_object" },
-});
-
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error("OpenAI response was empty");
+    for (const key of analysisKeys) {
+      analysis[key] = await runKeyCompletion({ key, task, context, language });
     }
-    
-    console.log("🧠 OpenAI raw content:", String(content).slice(0, 1200));
-    const analysis = parseAnalysisResponse(content);
 
-    return res.json({ analysis });
+    return res.json({ analysis, language });
   } catch (err) {
     console.error("OpenAI request failed:", err);
 
     // ВАЖНО: возвращаем детали, чтобы фронт мог показать ошибку,
     // а не только "Failed to fetch"
+    return res.status(500).json({
+      error: "OpenAI request failed",
+      details: err?.message ? String(err.message) : String(err),
+    });
+  }
+});
+
+app.post("/analyze/stream", async (req, res) => {
+  const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
+  const context =
+    typeof req.body?.context === "string" ? req.body.context.trim() : "";
+
+  if (!task) {
+    return res.status(400).json({ error: "task is required" });
+  }
+
+  if (!openaiClient) {
+    return res
+      .status(500)
+      .json({ error: "AI is not configured (missing env vars)" });
+  }
+
+  const language = resolveLanguage(`${task} ${context}`);
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders?.();
+
+  let closed = false;
+  req.on("close", () => {
+    closed = true;
+  });
+
+  writeSseEvent(res, "status", {
+    status: "started",
+    total: analysisKeys.length,
+    language,
+  });
+
+  let completed = 0;
+  for (const key of analysisKeys) {
+    if (closed) break;
+    try {
+      const value = await runKeyCompletion({ key, task, context, language });
+      completed += 1;
+      writeSseEvent(res, "key", { key, value, status: "ok" });
+      writeSseEvent(res, "status", {
+        status: "progress",
+        completed,
+        total: analysisKeys.length,
+      });
+    } catch (error) {
+      console.error(`OpenAI request failed for ${key}:`, error);
+      writeSseEvent(res, "error", {
+        key,
+        error: "OpenAI request failed",
+        details: error?.message ? String(error.message) : String(error),
+      });
+    }
+  }
+
+  if (!closed) {
+    writeSseEvent(res, "done", { status: "done" });
+    res.end();
+  }
+});
+
+app.post("/analyze/deeper", async (req, res) => {
+  try {
+    const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
+    const context =
+      typeof req.body?.context === "string" ? req.body.context.trim() : "";
+    const key = typeof req.body?.key === "string" ? req.body.key.trim() : "";
+    const currentAnalysis =
+      typeof req.body?.currentAnalysis === "object"
+        ? req.body.currentAnalysis
+        : null;
+
+    if (!task) {
+      return res.status(400).json({ error: "task is required" });
+    }
+
+    if (!analysisKeys.includes(key)) {
+      return res.status(400).json({ error: "key is invalid" });
+    }
+
+    if (!openaiClient) {
+      return res
+        .status(500)
+        .json({ error: "AI is not configured (missing env vars)" });
+    }
+
+    const language = resolveLanguage(`${task} ${context}`);
+    const value = await runDeeper({
+      key,
+      task,
+      context,
+      language,
+      currentAnalysis,
+    });
+
+    return res.json({ key, value, language });
+  } catch (err) {
+    console.error("OpenAI request failed:", err);
+    return res.status(500).json({
+      error: "OpenAI request failed",
+      details: err?.message ? String(err.message) : String(err),
+    });
+  }
+});
+
+app.post("/analyze/verify", async (req, res) => {
+  try {
+    const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
+    const context =
+      typeof req.body?.context === "string" ? req.body.context.trim() : "";
+    const key = typeof req.body?.key === "string" ? req.body.key.trim() : "";
+    const value =
+      typeof req.body?.value === "string" ? req.body.value.trim() : "";
+    const currentAnalysis =
+      typeof req.body?.currentAnalysis === "object"
+        ? req.body.currentAnalysis
+        : null;
+
+    if (!task) {
+      return res.status(400).json({ error: "task is required" });
+    }
+
+    if (!analysisKeys.includes(key)) {
+      return res.status(400).json({ error: "key is invalid" });
+    }
+
+    if (!openaiClient) {
+      return res
+        .status(500)
+        .json({ error: "AI is not configured (missing env vars)" });
+    }
+
+    const language = resolveLanguage(`${task} ${context}`);
+    const updatedValue = await runVerify({
+      key,
+      task,
+      context,
+      language,
+      currentAnalysis,
+      value,
+    });
+
+    return res.json({ key, value: updatedValue, language });
+  } catch (err) {
+    console.error("OpenAI request failed:", err);
     return res.status(500).json({
       error: "OpenAI request failed",
       details: err?.message ? String(err.message) : String(err),

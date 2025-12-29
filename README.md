@@ -2,8 +2,8 @@
 
 BuddyMoving is a product-design copilot that turns a task description into a
 structured analysis (audience, metrics, risks, questions, scenarios, and
-approaches) by calling an AI gateway from a lightweight Node/Express backend and
-serving a Vite/React frontend.
+approaches) by calling OpenAI from a lightweight Node/Express backend and
+serving a static frontend (GitHub Pages) or the optional Vite build.
 
 **Live demo (Render):** https://buddy-moving.onrender.com
 
@@ -30,29 +30,27 @@ The Vite base path is set to `/buddy-moving/` for GitHub Pages, so assets and ro
 cd backend
 npm install
 # Create backend/.env with:
-# AI_BASE_URL=...
-# AI_API_KEY=...
-# AI_MODEL=gpt-4o-mini
+# OPENAI_API_KEY=...
+# OPENAI_MODEL=gpt-4o-mini
 node server.js
 ```
 
 ```bash
 # Frontend
-cd frontend
-cp .env.example .env
-# Set VITE_API_BASE to your backend, e.g. http://localhost:3000
-npm install
-npm run dev
+cd docs
+# Open index.html or serve this folder with a static server
+# Ensure the API base in docs/app.js points to your backend.
 ```
 
-**HeroUI + Tailwind setup:** The frontend uses HeroUI default styles via Tailwind. The Tailwind config lives in `frontend/tailwind.config.js` (including the HeroUI plugin), with PostCSS in `frontend/postcss.config.js`, and the Tailwind layers imported from `frontend/src/index.css`.
+**Optional Vite build:** If you use the Vite frontend, set `VITE_API_BASE` in
+`frontend/.env` (e.g. http://localhost:3000) and run `npm install` + `npm run dev`
+inside `frontend/`.
 
 ## Environment variables
 
 Backend (`backend/.env`):
-- `AI_BASE_URL` – base URL for the AI gateway (expects /chat/completions)
-- `AI_API_KEY` – API key for the gateway
-- `AI_MODEL` – model name (default: gpt-4o-mini)
+- `OPENAI_API_KEY` – OpenAI API key
+- `OPENAI_MODEL` – model name (default: gpt-4o-mini)
 
 Frontend (`frontend/.env`):
 - `VITE_API_BASE` – backend base URL
@@ -70,8 +68,8 @@ npm run start
 ```
 
 **Environment variables (Render)**
-- `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`
-- `VITE_API_BASE` (set to the Render URL of this service)
+- `OPENAI_API_KEY`, `OPENAI_MODEL`
+- `VITE_API_BASE` (set to the Render URL of this service if using Vite)
 - `NPM_CONFIG_REGISTRY=https://registry.npmjs.org/`
 
 ## Troubleshooting
@@ -87,7 +85,24 @@ npm run start
   always-auth=false
   ```
 
-**Cloudflare challenge / gateway blocks**
-- The backend uses `curl` to avoid Cloudflare blocks, but if you still see
-  “Cloudflare challenge” errors, confirm the gateway allows server-to-server
-  access and that `AI_BASE_URL` points to the correct endpoint.
+## API endpoints
+
+**POST `/analyze`**
+- Body: `{ task, context }`
+- Returns: `{ analysis, language }`
+
+**POST `/analyze/stream` (SSE)**
+- Body: `{ task, context }`
+- Streams events:
+  - `event: key` → `{ key, value, status }`
+  - `event: status` → `{ status, completed, total }`
+  - `event: error` → `{ key, error, details }`
+  - `event: done` → `{ status: "done" }`
+
+**POST `/analyze/deeper`**
+- Body: `{ task, context, key, currentAnalysis }`
+- Returns: `{ key, value, language }`
+
+**POST `/analyze/verify`**
+- Body: `{ task, context, key, value, currentAnalysis }`
+- Returns: `{ key, value, language }`
