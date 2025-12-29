@@ -218,6 +218,21 @@ input::placeholder {
   transition: border 0.2s ease, color 0.2s ease;
 }
 
+.card-btn.icon-only {
+  padding: 4px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-btn.icon-only svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
 .card-btn:hover {
   border-color: rgba(255, 255, 255, 0.35);
   color: #f1f3f4;

@@ -61,6 +61,14 @@ const setCardLoading = (key, isLoading, placeholder = "Loading…") => {
   }
 };
 
+const setCopyButtonState = (button, isCopied) => {
+  if (!button) return;
+  const label = isCopied ? "Copied" : button.dataset.label || "Copy";
+  button.setAttribute("aria-label", label);
+  button.setAttribute("title", label);
+  button.classList.toggle("copied", isCopied);
+};
+
 const updateCard = (key, value) => {
   const card = elements.cards[key];
   if (!card) return;
@@ -124,6 +132,79 @@ const streamAnalysis = async ({ task, context }) => {
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let sawDone = false;
+  let total = ANALYSIS_KEYS.length;
+  let completed = 0;
+  let hasProgressEvents = false;
+
+  const finishPendingCards = (message) => {
+    ANALYSIS_KEYS.forEach((key) => {
+      if (elements.cards[key].container.classList.contains("loading")) {
+        updateCard(key, message);
+      }
+    });
+  };
+
+  const handleSsePayload = (event, data) => {
+    if (!event) return;
+
+    if (event === "key") {
+      if (!data) return;
+      try {
+        const payload = JSON.parse(data);
+        updateCard(payload.key, payload.value);
+        if (!hasProgressEvents) {
+          completed += 1;
+          updateProgress(completed, total);
+        }
+      } catch (error) {
+        console.warn("Failed to parse key event", error);
+      }
+    }
+
+    if (event === "status") {
+      if (!data) return;
+      try {
+        const payload = JSON.parse(data);
+        if (payload.status === "started") {
+          total = payload.total ?? total;
+          completed = 0;
+          updateProgress(completed, total);
+          return;
+        }
+        if (payload.status === "progress") {
+          hasProgressEvents = true;
+          completed = payload.completed ?? completed;
+          total = payload.total ?? total;
+          updateProgress(completed, total);
+        }
+      } catch (error) {
+        console.warn("Failed to parse status event", error);
+      }
+    }
+
+    if (event === "error") {
+      if (!data) return;
+      try {
+        const payload = JSON.parse(data);
+        if (payload?.key) {
+          updateCard(payload.key, `Error: ${payload.error || "Failed"}`);
+        }
+        showToast(payload?.error || "Analysis failed.", "error");
+        if (!hasProgressEvents) {
+          completed += 1;
+          updateProgress(completed, total);
+        }
+      } catch (error) {
+        showToast("Analysis failed.", "error");
+      }
+    }
+
+    if (event === "done") {
+      sawDone = true;
+      updateProgress(total, total);
+    }
+  };
 
   while (true) {
     const { value, done } = await reader.read();
@@ -135,50 +216,18 @@ const streamAnalysis = async ({ task, context }) => {
 
     events.forEach((rawEvent) => {
       const { event, data } = parseSseEvent(rawEvent);
-      if (!event || !data) return;
-
-      if (event === "key") {
-        try {
-          const payload = JSON.parse(data);
-          updateCard(payload.key, payload.value);
-        } catch (error) {
-          console.warn("Failed to parse key event", error);
-        }
-      }
-
-      if (event === "status") {
-        try {
-          const payload = JSON.parse(data);
-          updateProgress(payload.completed, payload.total);
-        } catch (error) {
-          console.warn("Failed to parse status event", error);
-        }
-      }
-
-      if (event === "error") {
-        try {
-          const payload = JSON.parse(data);
-          if (payload?.key) {
-            updateCard(payload.key, `Error: ${payload.error || "Failed"}`);
-          }
-          showToast(payload?.error || "Analysis failed.", "error");
-        } catch (error) {
-          showToast("Analysis failed.", "error");
-        }
-      }
+      handleSsePayload(event, data);
     });
   }
 
   if (buffer.trim()) {
     const { event, data } = parseSseEvent(buffer);
-    if (event === "key") {
-      try {
-        const payload = JSON.parse(data);
-        updateCard(payload.key, payload.value);
-      } catch (error) {
-        console.warn("Failed to parse trailing key event", error);
-      }
-    }
+    handleSsePayload(event, data);
+  }
+
+  if (!sawDone) {
+    finishPendingCards("Error: stream ended early.");
+    showToast("Stream ended early. Analysis marked complete.", "error");
   }
 };
 
@@ -213,24 +262,21 @@ const handleCardAction = async (action, key, cardElement) => {
     return;
   }
 
-  if (action === "copy") {
-    const value = currentAnalysis[key] || elements.cards[key].value.textContent;
-    try {
-      await navigator.clipboard.writeText(value);
-      const button = cardElement.querySelector(`[data-action="copy"]`);
-      if (button) {
-        const originalText = button.textContent;
-        button.textContent = "Copied";
-        button.classList.add("copied");
-        setTimeout(() => {
-          button.textContent = originalText;
-          button.classList.remove("copied");
-        }, 1000);
+    if (action === "copy") {
+      const value = currentAnalysis[key] || elements.cards[key].value.textContent;
+      try {
+        await navigator.clipboard.writeText(value);
+        const button = cardElement.querySelector(`[data-action="copy"]`);
+        if (button) {
+          setCopyButtonState(button, true);
+          setTimeout(() => {
+            setCopyButtonState(button, false);
+          }, 1000);
+        }
+      } catch (error) {
+        showToast("Copy failed. Please try again.", "error");
       }
-    } catch (error) {
-      showToast("Copy failed. Please try again.", "error");
-    }
-    return;
+      return;
   }
 
   const endpoint =
