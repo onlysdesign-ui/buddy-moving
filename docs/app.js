@@ -33,6 +33,8 @@ let currentAnalysis = ANALYSIS_KEYS.reduce((acc, key) => {
   acc[key] = "";
   return acc;
 }, {});
+let activeStreamController = null;
+let activeStreamId = 0;
 
 const showToast = (message, type = "success") => {
   elements.toast.textContent = message;
@@ -110,7 +112,7 @@ const parseSseEvent = (rawEvent) => {
   return { event, data: dataLines.join("\n") };
 };
 
-const streamAnalysis = async ({ task, context }) => {
+const streamAnalysis = async ({ task, context, signal }) => {
   const response = await fetch(`${API_BASE}/analyze/stream`, {
     method: "POST",
     headers: {
@@ -118,6 +120,7 @@ const streamAnalysis = async ({ task, context }) => {
       Accept: "text/event-stream",
     },
     body: JSON.stringify({ task, context }),
+    signal,
   });
 
   if (!response.ok) {
@@ -230,6 +233,9 @@ const streamAnalysis = async ({ task, context }) => {
   } catch (error) {
     streamError = error;
   } finally {
+    if (signal?.aborted) {
+      return;
+    }
     if (!sawDone) {
       finishPendingCards("Failed / no response.");
       updateProgress(total, total);
@@ -251,16 +257,30 @@ const analyzeTask = async () => {
     return;
   }
 
+  if (activeStreamController) {
+    activeStreamController.abort();
+  }
+
+  const controller = new AbortController();
+  const requestId = ++activeStreamId;
+  activeStreamController = controller;
+
   setStatus(true);
   resetCardsForLoading();
 
   try {
-    await streamAnalysis({ task, context });
+    await streamAnalysis({ task, context, signal: controller.signal });
     showToast("Analysis complete.");
   } catch (error) {
+    if (controller.signal.aborted) {
+      return;
+    }
     showToast(`Analysis failed. ${error.message}`, "error");
   } finally {
-    setStatus(false);
+    if (activeStreamId === requestId) {
+      activeStreamController = null;
+      setStatus(false);
+    }
   }
 };
 
