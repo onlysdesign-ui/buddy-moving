@@ -555,6 +555,10 @@ app.post("/analyze/stream", async (req, res) => {
   const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
   const context =
     typeof req.body?.context === "string" ? req.body.context.trim() : "";
+  const requestedKeys = Array.isArray(req.body?.keys)
+    ? req.body.keys.filter((key) => analysisKeys.includes(key))
+    : analysisKeys;
+  const keysToAnalyze = requestedKeys.length ? requestedKeys : analysisKeys;
 
   if (!task) {
     return res.status(400).json({ error: "task is required" });
@@ -582,13 +586,13 @@ app.post("/analyze/stream", async (req, res) => {
 
   writeSseEvent(res, "status", {
     status: "started",
-    total: analysisKeys.length,
+    total: keysToAnalyze.length,
     language,
   });
 
   let completed = 0;
   try {
-    for (const key of analysisKeys) {
+    for (const key of keysToAnalyze) {
       if (clientGone) {
         return;
       }
@@ -597,7 +601,7 @@ app.post("/analyze/stream", async (req, res) => {
         status: "key-start",
         key,
         completed,
-        total: analysisKeys.length,
+        total: keysToAnalyze.length,
       });
       try {
         const value = await runKeyCompletion({
@@ -629,7 +633,7 @@ app.post("/analyze/stream", async (req, res) => {
         writeSseEvent(res, "status", {
           status: "progress",
           completed,
-          total: analysisKeys.length,
+          total: keysToAnalyze.length,
         });
       }
     }
