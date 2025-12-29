@@ -36,12 +36,21 @@ Expected response shape:
 ```json
 {
   "analysis": {
-    "audience": "...",
-    "metrics": "...",
-    "risks": "...",
-    "questions": "...",
+    "framing": "...",
+    "audience_focus": "...",
+    "hypotheses": "...",
     "scenarios": "...",
-    "approaches": "..."
+    "success_criteria": "...",
+    "options": "...",
+    "recommendation": "..."
   }
 }
+```
+
+## Test the analyze stream endpoint
+
+```bash
+curl -N -H "Content-Type: application/json" \
+  -d '{"task":"Design a moving assistant for renters","context":"Focus on students moving between dorms","keys":["framing","audience_focus","hypotheses","scenarios","success_criteria","options","recommendation"]}' \
+  http://localhost:3000/analyze/stream
 ```

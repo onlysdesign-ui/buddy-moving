@@ -80,64 +80,125 @@ app.use(express.static(distPath));
 // Analysis helpers
 // ------------------------------
 const analysisKeys = [
-  "audience",
-  "metrics",
-  "risks",
-  "questions",
+  "framing",
+  "audience_focus",
+  "hypotheses",
   "scenarios",
-  "approaches",
+  "success_criteria",
+  "options",
+  "recommendation",
 ];
 
 const keyInstructions = {
-  audience: [
-    "Answer: Who is the user and what jobs are they trying to get done?",
-    "- Primary audience (who they are, their environment)",
-    "- Secondary audiences/stakeholders (if relevant)",
-    "- User goals + motivations (what they want to achieve)",
-    "- Pain points and constraints (time, skill, trust, device, context)",
-    "- Segments (2-3 meaningful segments: novice vs expert, B2B vs B2C, etc.)",
-    "- Non-users / excluded groups (who this is NOT for, if that matters)",
+  framing: [
+    "Output format:",
+    "### Problem",
+    "- <1-2 sentences>",
+    "",
+    "### Desired outcome",
+    "- <1 sentence>",
+    "",
+    "### Non-goals",
+    "- <3-5 bullets>",
+    "",
+    "### Assumptions",
+    "- Assumption (confidence): <text> - Impact: <impact>",
+    "(3-5 items)",
   ].join("\n"),
-  metrics: [
-    "Answer: How do we measure success and whether the solution works?",
-    "- Core success metric (North Star) tied to user value",
-    "- Supporting metrics (behavioral + outcome + quality)",
-    "- Guardrails (avoid making it worse: errors, churn, complaints)",
-    "- Leading indicators (early signals)",
-    "- Instrumentation hints (what needs tracking)",
-    "Rules: Prefer measurable, observable metrics; include baseline/target hints.",
+  audience_focus: [
+    "Output format:",
+    "### Possible segments",
+    "- Segment A: <who> - Main need: <need>",
+    "- Segment B: <who> - Main need: <need>",
+    "- Segment C: <who> - Main need: <need>",
+    "",
+    "### Primary focus",
+    "- Chosen: Segment <A/B/C> (<confidence>)",
+    "- Why this is primary:",
+    "  - <3 bullets>",
+    "",
+    "### Primary segment details",
+    "- Who: ...",
+    "- Goals:",
+    "  - <3 bullets>",
+    "- Pains:",
+    "  - <3 bullets>",
+    "- Triggers:",
+    "  - <2-3 bullets>",
   ].join("\n"),
-  risks: [
-    "Answer: What can go wrong and what could kill adoption or trust?",
-    "- Product risks (wrong problem, unclear value, poor adoption)",
-    "- UX risks (confusion, cognitive load, edge cases)",
-    "- Trust & safety risks (misleading outputs, hallucinations, bias)",
-    "- Legal/compliance/privacy risks (PII, data retention)",
-    "- Technical risks (latency, reliability, cost)",
-    "- Stakeholder risks (misalignment, scope creep)",
-    "For each risk: state the risk + impact + mitigation idea.",
-  ].join("\n"),
-  questions: [
-    "Answer: What do we need to learn before building or shipping?",
-    "- The most important unknowns (5-10)",
-    "- Questions for user research (needs, behaviors, current workarounds)",
-    "- Questions for feasibility (data, constraints, system behavior)",
-    "- Questions for business (who pays, why now, differentiation)",
-    "- Questions for AI behavior (accuracy, failure modes, acceptable errors)",
-    "Make questions actionable: testable via interviews, prototypes, analytics.",
+  hypotheses: [
+    "Output format:",
+    "### Hypotheses for the primary segment",
+    "- (confidence) If we <do X>, then <Y>, because <Z>. Depends on: <assumption/constraint>",
+    "(5-7 items)",
+    "",
+    "### What these hypotheses optimize for",
+    "- <3 bullets>",
   ].join("\n"),
   scenarios: [
-    "Answer: What are the key user flows and real-life situations we must support?",
-    "- 3-6 scenarios with: Trigger/context, user goal, high-level steps, success outcome,",
-    "  common failure case / edge case.",
-    "- Include at least one: happy path, stressful/urgent path, novice path, edge/failure path.",
+    "Output format:",
+    "### Key scenarios (primary segment)",
+    "1) <scenario name>",
+    "- Intent: <1 sentence>",
+    "- Steps:",
+    "  1. ...",
+    "  2. ...",
+    "  3. ...",
+    "- Success criteria:",
+    "  - <2-3 bullets>",
+    "",
+    "(3-5 scenarios)",
+    "",
+    "### Moment of truth",
+    "- <1 sentence> + why",
   ].join("\n"),
-  approaches: [
-    "Answer: What are viable solution directions and how would we validate them?",
-    "- 3-5 distinct solution approaches",
-    "- For each: concept in one line, why it might work (insight),",
-    "  what to prototype/test (MVP test), risks/tradeoffs, complexity (low/med/high)",
-    "Ensure approaches are meaningfully different and testable quickly.",
+  success_criteria: [
+    "Output format:",
+    "### Must-have success criteria",
+    "- MUST: <criterion> - Measure later: <how>",
+    "(2-3)",
+    "",
+    "### Should-have success criteria",
+    "- SHOULD: <criterion> - Measure later: <how>",
+    "(3-5)",
+  ].join("\n"),
+  options: [
+    "Output format:",
+    "### Option A (recommended direction)",
+    "- What it is: <2 sentences>",
+    "- Why it works for the primary segment:",
+    "  - <3-5 bullets>",
+    "- Trade-offs:",
+    "  - <3 bullets>",
+    "- Risks created:",
+    "  - <2-3 bullets>",
+    "",
+    "### Option B (alternative)",
+    "(same but shorter)",
+    "",
+    "### Option C (optional)",
+    "(if meaningful)",
+  ].join("\n"),
+  recommendation: [
+    "Output format:",
+    "### Recommendation",
+    "- Choose: Option <A/B/C>",
+    "- Why:",
+    "  - <3-6 bullets>",
+    "",
+    "### Trade-offs we accept",
+    "- <3 bullets>",
+    "",
+    "### First week plan",
+    "- Day 1-2: <actions>",
+    "- Day 3-4: <actions>",
+    "- Day 5-7: <actions>",
+    "",
+    "### First validation steps",
+    "- <3-5 bullets>",
+    "",
+    "### If our assumptions are wrong",
+    "- <2-3 bullets>",
   ].join("\n"),
 };
 
@@ -176,14 +237,30 @@ function resolveLanguage(text) {
 function buildKeyPrompt({ key, task, context, language, caseFile }) {
   const languageLabel = languageLabels[language] || "English";
   const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
+  const primaryFocusKeys = new Set([
+    "hypotheses",
+    "scenarios",
+    "success_criteria",
+    "options",
+    "recommendation",
+  ]);
   return [
-    "You are a senior product designer + product strategist.",
+    "You are a senior product designer + product thinker.",
     `Respond only for the "${key}" section.`,
     `Write in ${languageLabel}.`,
-    "Use short paragraphs and bullet-like formatting inside the response (use '-' for bullets).",
-    "Avoid vague language; be concrete and actionable.",
-    "Use the Case File to stay consistent. Do not invent new entities unless required.",
-    "Prefer updating or extending existing entities in the Case File.",
+    "You must NOT ask the user questions.",
+    "If information is missing, use Assumption (confidence): ... - Impact: ...",
+    "Do NOT invent budgets, timelines, or KPIs. Use qualitative success criteria only.",
+    "Keep output structured with markdown headings starting with '###'.",
+    "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
+    "Keep sections short; avoid long prose.",
+    "Be concrete and specific.",
+    "Use the Case File to stay consistent. Avoid introducing new entities unless needed.",
+    "Use the existing primary_focus and assumptions if present. Do not change them unless framing/audience_focus.",
+    primaryFocusKeys.has(key)
+      ? "Base the analysis on primary_focus. If primary_focus is missing, pick one and mark it as Assumption (confidence) before using it."
+      : null,
+    "Secondary segments should be brief; go deep only on the primary focus.",
     "",
     "TASK:",
     task,
@@ -196,7 +273,9 @@ function buildKeyPrompt({ key, task, context, language, caseFile }) {
     "",
     "KEY SPECIFICATION:",
     keyInstructions[key],
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 function buildContextSummary(currentAnalysis, keyToSkip) {
@@ -214,6 +293,24 @@ function buildContextSummary(currentAnalysis, keyToSkip) {
     .filter(Boolean);
 
   return lines.length ? lines.join("\n") : "(none)";
+}
+
+function appendDebugLine(value, caseFile) {
+  if (process.env.DEBUG_CASEFILE !== "true") {
+    return value;
+  }
+  const safeCaseFile = caseFile || createEmptyCaseFile();
+  const primaryFocus = safeCaseFile?.primary_focus?.segment || "";
+  const assumptionsCount = Array.isArray(safeCaseFile?.assumptions)
+    ? safeCaseFile.assumptions.length
+    : 0;
+  const hypothesesCount = Array.isArray(safeCaseFile?.hypotheses)
+    ? safeCaseFile.hypotheses.length
+    : 0;
+  const scenariosCount = Array.isArray(safeCaseFile?.scenarios)
+    ? safeCaseFile.scenarios.length
+    : 0;
+  return `${value}\n[debug] primary_focus="${primaryFocus}" | assumptions=${assumptionsCount} | hypotheses=${hypothesesCount} | scenarios=${scenariosCount}`;
 }
 
 async function runWithTimeout(label, timeoutMs, fn, { signal } = {}) {
@@ -345,7 +442,7 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
                 role: "system",
                 content: [
                   "You are a senior product designer + product strategist.",
-                  "Respond with plain text only. No JSON, no markdown headers.",
+                  "Respond with plain text only. Use markdown headings '###'. No JSON.",
                 ].join("\n"),
               },
               { role: "user", content: prompt },
@@ -378,15 +475,29 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
   return content.trim();
 }
 
-async function runDeeper({ key, task, context, language, currentAnalysis, signal }) {
+async function runDeeper({
+  key,
+  task,
+  context,
+  language,
+  currentAnalysis,
+  caseFile,
+  signal,
+}) {
   const otherContext = buildContextSummary(currentAnalysis, key);
+  const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
   const prompt = [
-    "You are a senior product designer + product strategist.",
-    `Write a deeper, more detailed version of the "${key}" analysis.`,
+    "You are a senior product designer + product thinker.",
+    `Write a deeper, more detailed version of the "${key}" card.`,
     `Write in ${languageLabels[language] || "English"}.`,
+    "You must NOT ask the user questions.",
+    "Do NOT invent budgets, timelines, or KPIs. Use qualitative success criteria only.",
     "Stay consistent with the current analysis for the other keys.",
-    "Use short paragraphs and bullet-like formatting (use '-' for bullets).",
-    "Avoid vague abstractions; be concrete and actionable.",
+    "Use the existing primary_focus and assumptions if present. Do not change them unless framing/audience_focus.",
+    "Use markdown headings starting with '###'.",
+    "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
+    "Keep sections short; avoid long prose.",
+    "Be concrete and specific.",
     "",
     "TASK:",
     task,
@@ -396,6 +507,9 @@ async function runDeeper({ key, task, context, language, currentAnalysis, signal
     "",
     "CURRENT ANALYSIS FOR OTHER KEYS:",
     otherContext,
+    "",
+    "CASE FILE (JSON):",
+    serializedCaseFile || "(none)",
     "",
     "CURRENT VERSION TO EXPAND:",
     currentAnalysis?.[key] || "(none)",
@@ -417,7 +531,7 @@ async function runDeeper({ key, task, context, language, currentAnalysis, signal
               {
                 role: "system",
                 content:
-                  "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+                  "Respond with plain text only. Use markdown headings '###'. No JSON.",
               },
               { role: "user", content: prompt },
             ],
@@ -446,14 +560,29 @@ async function runDeeper({ key, task, context, language, currentAnalysis, signal
   return content.trim();
 }
 
-async function runVerify({ key, task, context, language, currentAnalysis, value, signal }) {
+async function runVerify({
+  key,
+  task,
+  context,
+  language,
+  currentAnalysis,
+  value,
+  caseFile,
+  signal,
+}) {
   const otherContext = buildContextSummary(currentAnalysis, key);
+  const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
   const prompt = [
-    "You are a senior product designer + product strategist.",
-    `Rewrite the "${key}" analysis to be more realistic and grounded.`,
+    "You are a senior product designer + product thinker.",
+    `Rewrite the "${key}" card to be more realistic and grounded.`,
     `Write in ${languageLabels[language] || "English"}.`,
     "Re-check realism, remove abstractions, add concrete constraints and assumptions.",
-    "Use short paragraphs and bullet-like formatting (use '-' for bullets).",
+    "You must NOT ask the user questions.",
+    "Do NOT invent budgets, timelines, or KPIs. Use qualitative success criteria only.",
+    "Use the existing primary_focus and assumptions if present. Do not change them unless framing/audience_focus.",
+    "Use markdown headings starting with '###'.",
+    "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
+    "Keep sections short; avoid long prose.",
     "Stay consistent with the other keys.",
     "",
     "TASK:",
@@ -464,6 +593,9 @@ async function runVerify({ key, task, context, language, currentAnalysis, value,
     "",
     "CURRENT ANALYSIS FOR OTHER KEYS:",
     otherContext,
+    "",
+    "CASE FILE (JSON):",
+    serializedCaseFile || "(none)",
     "",
     "CURRENT VALUE TO REWRITE:",
     value || currentAnalysis?.[key] || "(none)",
@@ -485,7 +617,7 @@ async function runVerify({ key, task, context, language, currentAnalysis, value,
               {
                 role: "system",
                 content:
-                  "Respond with plain text only. No JSON, no markdown headers, no extra labels.",
+                  "Respond with plain text only. Use markdown headings '###'. No JSON.",
               },
               { role: "user", content: prompt },
             ],
@@ -551,9 +683,30 @@ app.post("/analyze", async (req, res) => {
 
     const language = resolveLanguage(`${task} ${context}`);
     const analysis = {};
+    let caseFile = createEmptyCaseFile();
 
     for (const key of analysisKeys) {
-      analysis[key] = await runKeyCompletion({ key, task, context, language });
+      const value = await runKeyCompletion({
+        key,
+        task,
+        context,
+        language,
+        caseFile,
+      });
+      let updatedCaseFile = caseFile;
+      try {
+        updatedCaseFile = await updateCaseFile(
+          key,
+          value,
+          caseFile,
+          task,
+          context
+        );
+      } catch (updateError) {
+        console.warn(`[casefile] update failed after ${key}:`, updateError);
+      }
+      caseFile = updatedCaseFile;
+      analysis[key] = appendDebugLine(value, caseFile);
     }
 
     return res.json({ analysis, language });
@@ -631,9 +784,6 @@ app.post("/analyze/stream", async (req, res) => {
           caseFile,
         });
 
-        writeSseEvent(res, "key", { key, value, status: "ok" });
-        console.log(`[stream] done key=${key} ok`);
-
         try {
           caseFile = await updateCaseFile(key, value, caseFile, task, context);
           if (process.env.NODE_ENV !== "production") {
@@ -644,6 +794,10 @@ app.post("/analyze/stream", async (req, res) => {
         } catch (updateError) {
           console.warn(`[casefile] update failed after ${key}:`, updateError);
         }
+
+        const valueWithDebug = appendDebugLine(value, caseFile);
+        writeSseEvent(res, "key", { key, value: valueWithDebug, status: "ok" });
+        console.log(`[stream] done key=${key} ok`);
       } catch (error) {
         if (clientGone) {
           return;
@@ -687,6 +841,10 @@ app.post("/analyze/deeper", async (req, res) => {
       typeof req.body?.currentAnalysis === "object"
         ? req.body.currentAnalysis
         : null;
+    const caseFile =
+      typeof req.body?.caseFile === "object" && req.body.caseFile !== null
+        ? req.body.caseFile
+        : createEmptyCaseFile();
 
     if (!task) {
       return res.status(400).json({ error: "task is required" });
@@ -709,9 +867,10 @@ app.post("/analyze/deeper", async (req, res) => {
       context,
       language,
       currentAnalysis,
+      caseFile,
     });
 
-    return res.json({ key, value, language });
+    return res.json({ key, value: appendDebugLine(value, caseFile), language });
   } catch (err) {
     console.error("OpenAI request failed:", err);
     return res.status(500).json({
@@ -733,6 +892,10 @@ app.post("/analyze/verify", async (req, res) => {
       typeof req.body?.currentAnalysis === "object"
         ? req.body.currentAnalysis
         : null;
+    const caseFile =
+      typeof req.body?.caseFile === "object" && req.body.caseFile !== null
+        ? req.body.caseFile
+        : createEmptyCaseFile();
 
     if (!task) {
       return res.status(400).json({ error: "task is required" });
@@ -756,9 +919,14 @@ app.post("/analyze/verify", async (req, res) => {
       language,
       currentAnalysis,
       value,
+      caseFile,
     });
 
-    return res.json({ key, value: updatedValue, language });
+    return res.json({
+      key,
+      value: appendDebugLine(updatedValue, caseFile),
+      language,
+    });
   } catch (err) {
     console.error("OpenAI request failed:", err);
     return res.status(500).json({
