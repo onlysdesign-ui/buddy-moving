@@ -207,12 +207,14 @@ function buildContextSummary(currentAnalysis, keyToSkip) {
 
 async function runWithTimeout(fn, { timeoutMs = OPENAI_TIMEOUT_MS, label, signal }) {
   const controller = new AbortController();
-  const timeoutError = new Error(
-    `${label || "OpenAI request"} timed out after ${timeoutMs}ms`
-  );
+  const requestLabel = label || "OpenAI request";
+  const timeoutError = new Error(`${requestLabel} timed out after ${timeoutMs}ms`);
   timeoutError.name = "TimeoutError";
 
-  const abortHandler = () => controller.abort();
+  const abortHandler = () => {
+    console.warn(`[timeout] abort requested label=${requestLabel}`);
+    controller.abort();
+  };
   if (signal) {
     if (signal.aborted) {
       controller.abort();
@@ -222,27 +224,61 @@ async function runWithTimeout(fn, { timeoutMs = OPENAI_TIMEOUT_MS, label, signal
   }
 
   let timeoutId;
-  const timeoutPromise = new Promise((_, reject) => {
+  let hardTimeoutId;
+  const startTime = Date.now();
+  const hardTimeoutMs = timeoutMs + 1000;
+  console.log(`[timeout] start label=${requestLabel} timeoutMs=${timeoutMs}`);
+
+  const timeoutPromise = new Promise((resolve) => {
     timeoutId = setTimeout(() => {
+      console.warn(
+        `[timeout] soft-timeout label=${requestLabel} elapsedMs=${Date.now() - startTime}`
+      );
       controller.abort();
-      reject(timeoutError);
+      resolve({ ok: false, error: timeoutError, timedOut: true });
     }, timeoutMs);
+    timeoutId.unref?.();
   });
 
-  const requestPromise = fn(controller.signal);
+  const hardTimeoutPromise = new Promise((resolve) => {
+    hardTimeoutId = setTimeout(() => {
+      console.error(
+        `[timeout] hard-timeout label=${requestLabel} elapsedMs=${Date.now() - startTime}`
+      );
+      controller.abort();
+      resolve({ ok: false, error: timeoutError, timedOut: true, hardTimedOut: true });
+    }, hardTimeoutMs);
+    hardTimeoutId.unref?.();
+  });
+
+  const requestPromise = Promise.resolve()
+    .then(() => fn(controller.signal))
+    .then((value) => {
+      console.log(
+        `[timeout] success label=${requestLabel} elapsedMs=${Date.now() - startTime}`
+      );
+      return { ok: true, value };
+    })
+    .catch((error) => {
+      if (error?.name === "AbortError") {
+        const abortError = new Error(`${requestLabel} aborted`);
+        abortError.name = "AbortError";
+        console.warn(
+          `[timeout] abort label=${requestLabel} elapsedMs=${Date.now() - startTime}`
+        );
+        return { ok: false, error: abortError, aborted: true };
+      }
+      return { ok: false, error };
+    });
 
   try {
-    return await Promise.race([requestPromise, timeoutPromise]);
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      const abortError = new Error(`${label || "OpenAI request"} aborted`);
-      abortError.name = "AbortError";
-      throw abortError;
-    }
-    throw error;
+    return await Promise.race([requestPromise, timeoutPromise, hardTimeoutPromise]);
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
+    }
+    if (hardTimeoutId) {
+      clearTimeout(hardTimeoutId);
     }
     if (signal) {
       signal.removeEventListener("abort", abortHandler);
@@ -266,9 +302,11 @@ function logOpenAIError(key, err) {
 
 async function runKeyCompletion({ key, task, context, language, signal }) {
   const prompt = buildKeyPrompt({ key, task, context, language });
+  const startTime = Date.now();
+  console.log(`[openai] start key=${key}`);
   let response;
   try {
-    response = await runWithTimeout(
+    const result = await runWithTimeout(
       (signal) =>
         openaiClient.chat.completions.create(
           {
@@ -290,10 +328,16 @@ async function runKeyCompletion({ key, task, context, language, signal }) {
         ),
       { label: `OpenAI ${key} request`, signal }
     );
+    if (!result.ok) {
+      throw result.error;
+    }
+    response = result.value;
   } catch (error) {
     logOpenAIError(key, error);
+    console.log(`[openai] error key=${key} elapsedMs=${Date.now() - startTime}`);
     throw error;
   }
+  console.log(`[openai] success key=${key} elapsedMs=${Date.now() - startTime}`);
 
   const content = response?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
@@ -332,7 +376,7 @@ async function runDeeper({ key, task, context, language, currentAnalysis, signal
 
   let response;
   try {
-    response = await runWithTimeout(
+    const result = await runWithTimeout(
       (signal) =>
         openaiClient.chat.completions.create(
           {
@@ -352,6 +396,10 @@ async function runDeeper({ key, task, context, language, currentAnalysis, signal
         ),
       { label: `OpenAI deeper ${key} request`, signal }
     );
+    if (!result.ok) {
+      throw result.error;
+    }
+    response = result.value;
   } catch (error) {
     logOpenAIError(key, error);
     throw error;
@@ -394,7 +442,7 @@ async function runVerify({ key, task, context, language, currentAnalysis, value,
 
   let response;
   try {
-    response = await runWithTimeout(
+    const result = await runWithTimeout(
       (signal) =>
         openaiClient.chat.completions.create(
           {
@@ -414,6 +462,10 @@ async function runVerify({ key, task, context, language, currentAnalysis, value,
         ),
       { label: `OpenAI verify ${key} request`, signal }
     );
+    if (!result.ok) {
+      throw result.error;
+    }
+    response = result.value;
   } catch (error) {
     logOpenAIError(key, error);
     throw error;
@@ -432,6 +484,7 @@ function writeSseEvent(res, event, data) {
   const payload = typeof data === "string" ? data : JSON.stringify(data);
   res.write(`event: ${event}\n`);
   res.write(`data: ${payload}\n\n`);
+  res.flush?.();
 }
 
 
@@ -539,14 +592,38 @@ app.post("/analyze/stream", async (req, res) => {
         total: analysisKeys.length,
       });
       try {
-        const value = await runKeyCompletion({
-          key,
-          task,
-          context,
-          language,
-          signal: streamAbortController.signal,
+        const watchdogMs = OPENAI_TIMEOUT_MS + 1000;
+        let watchdogId;
+        const watchdogPromise = new Promise((resolve) => {
+          watchdogId = setTimeout(() => {
+            resolve({
+              ok: false,
+              error: new Error(`Timeout after ${watchdogMs}ms`),
+              timedOut: true,
+            });
+          }, watchdogMs);
+          watchdogId.unref?.();
         });
-        writeSseEvent(res, "key", { key, value, status: "ok" });
+
+        const keyResult = await Promise.race([
+          runKeyCompletion({
+            key,
+            task,
+            context,
+            language,
+            signal: streamAbortController.signal,
+          })
+            .then((value) => ({ ok: true, value }))
+            .catch((error) => ({ ok: false, error })),
+          watchdogPromise,
+        ]);
+        clearTimeout(watchdogId);
+
+        if (!keyResult.ok) {
+          throw keyResult.error;
+        }
+
+        writeSseEvent(res, "key", { key, value: keyResult.value, status: "ok" });
         console.log(`[stream] done key=${key} ok`);
       } catch (error) {
         if (closed) break;
