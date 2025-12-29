@@ -1,14 +1,21 @@
 const API_BASE = "https://buddy-moving.onrender.com";
-const BASE_KEYS = ["audience", "metrics", "scenarios", "approaches"];
-const ACTION_KEYS = ["risks", "questions"];
-const ANALYSIS_KEYS = [...BASE_KEYS, ...ACTION_KEYS];
+const DEFAULT_KEYS = [
+  "framing",
+  "audience_focus",
+  "hypotheses",
+  "scenarios",
+  "success_criteria",
+  "options",
+  "recommendation",
+];
 const KEY_LABELS = {
-  audience: "Audience",
-  metrics: "Metrics",
+  framing: "Task framing",
+  audience_focus: "Audience focus",
+  hypotheses: "Hypotheses",
   scenarios: "Scenarios",
-  approaches: "Approaches",
-  risks: "Risks",
-  questions: "Questions",
+  success_criteria: "Success criteria",
+  options: "Solution options",
+  recommendation: "Recommendation",
 };
 const STORAGE_KEYS = {
   task: "buddyMoving.task",
@@ -26,17 +33,15 @@ const elements = {
   statusText: document.getElementById("status-text"),
   toast: document.getElementById("toast"),
   resultsList: document.getElementById("results-list"),
-  actionRow: document.getElementById("action-row"),
 };
 
-let currentAnalysis = ANALYSIS_KEYS.reduce((acc, key) => {
+let currentAnalysis = DEFAULT_KEYS.reduce((acc, key) => {
   acc[key] = "";
   return acc;
 }, {});
 let activeStreamController = null;
 let activeStreamId = 0;
-let baseCompleted = 0;
-let baseSeen = new Set();
+let progressState = { completed: 0, total: 0 };
 
 const showToast = (message, type = "success") => {
   elements.toast.textContent = message;
@@ -87,7 +92,17 @@ const createResultCard = (key) => {
         </button>
       </div>
     </div>
-    <p>No details yet.</p>
+    <div class="card-body">
+      <p class="card-content">No details yet.</p>
+      <div class="card-skeleton" aria-hidden="true">
+        <span class="skeleton-line line-xl"></span>
+        <span class="skeleton-line line-lg"></span>
+        <span class="skeleton-line line-md"></span>
+        <span class="skeleton-line line-lg"></span>
+        <span class="skeleton-line line-sm"></span>
+      </div>
+    </div>
+    <div class="card-status" aria-live="polite"></div>
   `;
   return card;
 };
@@ -106,47 +121,80 @@ const ensureCard = (key, { moveToEnd = false } = {}) => {
   return card;
 };
 
-const setCardLoading = (key, isLoading, placeholder = "Loading…") => {
+const setCardLoading = (
+  key,
+  isLoading,
+  { placeholder = "Loading…", showSkeleton = false, statusText } = {},
+) => {
   const card = ensureCard(key);
   if (!card) return;
+  card.classList.remove("error");
   card.classList.toggle("loading", isLoading);
-  const body = card.querySelector("p");
-  if (isLoading && body) {
-    body.textContent = placeholder;
+  card.classList.toggle("skeleton", isLoading && showSkeleton);
+  const body = card.querySelector(".card-content");
+  const status = card.querySelector(".card-status");
+  if (body) {
+    if (!showSkeleton || !isLoading) {
+      body.textContent = isLoading ? placeholder : body.textContent;
+    }
+  }
+  if (status) {
+    status.textContent = isLoading ? statusText || placeholder : "";
   }
 };
 
 const updateCard = (key, value) => {
+  if (!Object.hasOwn(currentAnalysis, key)) {
+    currentAnalysis[key] = "";
+  }
   currentAnalysis[key] = value || "";
   const card = ensureCard(key);
   if (!card) return;
-  const body = card.querySelector("p");
+  const body = card.querySelector(".card-content");
   if (body) {
     body.textContent = value || "No details yet.";
   }
-  card.classList.remove("loading");
+  card.classList.remove("loading", "skeleton", "error");
+  const status = card.querySelector(".card-status");
+  if (status) {
+    status.textContent = "";
+  }
+};
+
+const setCardError = (key, message, details) => {
+  const card = ensureCard(key);
+  if (!card) return;
+  const body = card.querySelector(".card-content");
+  const detailText = details ? `\n${details}` : "";
+  if (body) {
+    body.textContent = `Error: ${message || "Failed"}${detailText}`;
+  }
+  card.classList.remove("loading", "skeleton");
+  card.classList.add("error");
+  const status = card.querySelector(".card-status");
+  if (status) {
+    status.textContent = "";
+  }
 };
 
 const resetCardsForLoading = () => {
   if (elements.resultsList) {
     elements.resultsList.innerHTML = "";
   }
-  ANALYSIS_KEYS.forEach((key) => {
+  DEFAULT_KEYS.forEach((key) => {
     currentAnalysis[key] = "";
   });
-  baseCompleted = 0;
-  baseSeen = new Set();
-  elements.actionRow?.classList.remove("visible");
-  elements.actionRow?.querySelectorAll(".action-card").forEach((card) => {
-    card.classList.remove("loading", "complete");
-    card.textContent = card.dataset.key ? `+ ${getKeyLabel(card.dataset.key)}` : "+";
-  });
+  progressState = { completed: 0, total: 0 };
 };
 
 const updateProgress = (completed, total) => {
   if (!elements.statusText) return;
   if (typeof completed === "number" && typeof total === "number") {
-    elements.statusText.textContent = `Analyzing… ${completed}/${total}`;
+    if (total > 0) {
+      elements.statusText.textContent = `Analyzing… ${completed}/${total}`;
+    } else {
+      elements.statusText.textContent = "Analyzing…";
+    }
   }
 };
 
@@ -169,7 +217,15 @@ const parseSseEvent = (rawEvent) => {
   return { event, data: dataLines.join("\n") };
 };
 
-const streamAnalysis = async ({ task, context, signal, keys, onKey, onError }) => {
+const streamAnalysis = async ({
+  task,
+  context,
+  signal,
+  keys,
+  onKey,
+  onError,
+  onStatus,
+}) => {
   const response = await fetch(`${API_BASE}/analyze/stream`, {
     method: "POST",
     headers: {
@@ -217,8 +273,8 @@ const streamAnalysis = async ({ task, context, signal, keys, onKey, onError }) =
       if (!data) return;
       try {
         const payload = JSON.parse(data);
-        if (payload.status === "started") {
-          return;
+        if (onStatus) {
+          onStatus(payload);
         }
       } catch (error) {
         console.warn("Failed to parse status event", error);
@@ -230,7 +286,7 @@ const streamAnalysis = async ({ task, context, signal, keys, onKey, onError }) =
       try {
         const payload = JSON.parse(data);
         if (payload?.key) {
-          updateCard(payload.key, `Error: ${payload.error || "Failed"}`);
+          setCardError(payload.key, payload.error, payload.details);
           if (onError) {
             onError(payload);
           }
@@ -302,20 +358,60 @@ const analyzeTask = async () => {
 
   setStatus(true);
   resetCardsForLoading();
-  updateProgress(0, BASE_KEYS.length);
+  let sawKeyStart = false;
+  let fallbackSkeletonsCreated = false;
 
   try {
     await streamAnalysis({
       task,
       context,
       signal: controller.signal,
-      keys: BASE_KEYS,
+      keys: DEFAULT_KEYS,
+      onStatus: (payload) => {
+        if (payload.status === "key-start" && payload.key) {
+          sawKeyStart = true;
+          setCardLoading(payload.key, true, {
+            showSkeleton: true,
+            statusText: "Analyzing...",
+          });
+          return;
+        }
+
+        if (payload.status === "started") {
+          if (typeof payload.total === "number") {
+            progressState = {
+              completed: typeof payload.completed === "number" ? payload.completed : 0,
+              total: payload.total,
+            };
+            updateProgress(progressState.completed, progressState.total);
+          }
+          if (!sawKeyStart && !fallbackSkeletonsCreated) {
+            DEFAULT_KEYS.forEach((key) => {
+              setCardLoading(key, true, {
+                showSkeleton: true,
+                statusText: "Analyzing...",
+              });
+            });
+            fallbackSkeletonsCreated = true;
+          }
+          return;
+        }
+
+        if (payload.status === "progress") {
+          if (
+            typeof payload.completed === "number" &&
+            typeof payload.total === "number"
+          ) {
+            progressState = {
+              completed: payload.completed,
+              total: payload.total,
+            };
+            updateProgress(progressState.completed, progressState.total);
+          }
+        }
+      },
       onKey: (payload) => {
         updateCard(payload.key, payload.value);
-        updateBaseProgress(payload.key);
-      },
-      onError: (payload) => {
-        updateBaseProgress(payload.key);
       },
     });
     showToast("Analysis complete.");
@@ -343,7 +439,9 @@ const handleCardAction = async (action, key, cardElement) => {
 
   if (action === "copy") {
     const value =
-      currentAnalysis[key] || cardElement.querySelector("p")?.textContent || "";
+      currentAnalysis[key] ||
+      cardElement.querySelector(".card-content")?.textContent ||
+      "";
     try {
       await navigator.clipboard.writeText(value);
       const button = cardElement.querySelector(`[data-action="copy"]`);
@@ -362,7 +460,10 @@ const handleCardAction = async (action, key, cardElement) => {
   const endpoint =
     action === "deeper" ? "/analyze/deeper" : "/analyze/verify";
 
-  setCardLoading(key, true, action === "deeper" ? "Deepening…" : "Rewriting…");
+  setCardLoading(key, true, {
+    placeholder: action === "deeper" ? "Deepening…" : "Rewriting…",
+    statusText: action === "deeper" ? "Deepening…" : "Rewriting…",
+  });
 
   try {
     const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -450,80 +551,27 @@ const updateContextIndicator = () => {
     : "Context set";
 };
 
-const updateBaseProgress = (key) => {
-  if (!BASE_KEYS.includes(key)) return;
-  if (baseSeen.has(key)) return;
-  baseSeen.add(key);
-  baseCompleted = baseSeen.size;
-  updateProgress(baseCompleted, BASE_KEYS.length);
-  if (baseCompleted >= BASE_KEYS.length) {
-    elements.actionRow?.classList.add("visible");
+const isTextInputTarget = (target) => {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target.tagName === "TEXTAREA") return true;
+  if (target.tagName === "INPUT") {
+    const type = target.type?.toLowerCase() || "text";
+    return ["text", "search", "email", "url", "tel", "password"].includes(type);
   }
-};
-
-const setActionCardState = (key, state) => {
-  const card = elements.actionRow?.querySelector(`[data-key="${key}"]`);
-  if (!card) return;
-  card.classList.remove("loading", "complete");
-  if (state === "loading") {
-    card.classList.add("loading");
-    card.textContent = "Loading...";
-  } else if (state === "complete") {
-    card.classList.add("complete");
-    card.textContent = "Generated ✓";
-  } else {
-    card.textContent = `+ ${getKeyLabel(key)}`;
-  }
-};
-
-const runActionKey = async (key) => {
-  const task = elements.task.value.trim();
-  const context = elements.context.value.trim();
-
-  if (!task) {
-    showToast("Please enter a task first.", "error");
-    return;
-  }
-
-  if (activeStreamController) {
-    activeStreamController.abort();
-  }
-
-  const controller = new AbortController();
-  const requestId = ++activeStreamId;
-  activeStreamController = controller;
-
-  setStatus(true);
-  setActionCardState(key, "loading");
-  ensureCard(key, { moveToEnd: true });
-  setCardLoading(key, true, "Loading…");
-
-  try {
-    await streamAnalysis({
-      task,
-      context,
-      signal: controller.signal,
-      keys: [key],
-      onKey: (payload) => updateCard(payload.key, payload.value),
-    });
-    setActionCardState(key, "complete");
-    showToast(`${getKeyLabel(key)} ready.`);
-  } catch (error) {
-    if (controller.signal.aborted) {
-      return;
-    }
-    setActionCardState(key, "idle");
-    showToast(`Analysis failed. ${error.message}`, "error");
-  } finally {
-    if (activeStreamId === requestId) {
-      activeStreamController = null;
-      setStatus(false);
-    }
-  }
+  return false;
 };
 
 const init = () => {
   elements.analyze.addEventListener("click", analyzeTask);
+
+  document.addEventListener("keydown", (event) => {
+    if (!isTextInputTarget(event.target)) return;
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      analyzeTask();
+    }
+  });
 
   elements.resultsList?.addEventListener("click", (event) => {
     const button = event.target.closest(".card-btn");
@@ -534,15 +582,6 @@ const init = () => {
     const key = card?.dataset.key;
     if (!key) return;
     handleCardAction(action, key, card);
-  });
-
-  elements.actionRow?.addEventListener("click", (event) => {
-    const card = event.target.closest(".action-card");
-    if (!card) return;
-    const key = card.dataset.key;
-    if (!key) return;
-    if (card.classList.contains("loading")) return;
-    runActionKey(key);
   });
 
   elements.task.addEventListener("input", (event) => {
