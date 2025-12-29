@@ -121,6 +121,8 @@ const keyInstructions = {
     "- Why this framing (vs another plausible framing): <1-2 bullets>",
     "- Trade-offs of this framing: <1-2 bullets>",
     "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
+    "### Final check (silent)",
+    "- Ensure no rephrasing, add concrete UI/mechanism details, include risks/trade-offs where relevant, and do not invent numbers.",
   ].join("\n"),
   audience_focus: [
     "Output format:",
@@ -149,6 +151,8 @@ const keyInstructions = {
     "- Why this focus (vs another plausible focus): <1-2 bullets>",
     "- Trade-offs: <1-2 bullets>",
     "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
+    "### Final check (silent)",
+    "- Ensure no rephrasing, add concrete UI/mechanism details, include risks/trade-offs where relevant, and do not invent numbers.",
   ].join("\n"),
   hypotheses: [
     "Output format:",
@@ -166,6 +170,8 @@ const keyInstructions = {
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
     "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
+    "### Final check (silent)",
+    "- Ensure no rephrasing, add concrete UI/mechanism details, include risks/trade-offs where relevant, and do not invent numbers.",
   ].join("\n"),
   scenarios: [
     "Output format:",
@@ -197,6 +203,8 @@ const keyInstructions = {
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
     "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
+    "### Final check (silent)",
+    "- Ensure no rephrasing, add concrete UI/mechanism details, include risks/trade-offs where relevant, and do not invent numbers.",
   ].join("\n"),
   success_criteria: [
     "Output format:",
@@ -226,6 +234,8 @@ const keyInstructions = {
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
     "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
+    "### Final check (silent)",
+    "- Ensure no rephrasing, add concrete UI/mechanism details, include risks/trade-offs where relevant, and do not invent numbers.",
   ].join("\n"),
   options: [
     "Output format:",
@@ -269,6 +279,8 @@ const keyInstructions = {
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
     "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
+    "### Final check (silent)",
+    "- Ensure no rephrasing, add concrete UI/mechanism details, include risks/trade-offs where relevant, and do not invent numbers.",
   ].join("\n"),
   recommendation: [
     "Output format:",
@@ -317,6 +329,8 @@ const keyInstructions = {
     "- Chosen: <1 bullet + why>",
     "- Trade-offs accepted: <1-2 bullets>",
     "- Final check: no rephrasing, include at least 2 concrete UI details, include at least 1 risk/trade-off where applicable.",
+    "### Final check (silent)",
+    "- Ensure no rephrasing, add concrete UI/mechanism details, include risks/trade-offs where relevant, and do not invent numbers.",
   ].join("\n"),
 };
 
@@ -381,6 +395,7 @@ function buildKeyPrompt({ key, task, context, language, caseFile }) {
     "Keep output structured with markdown headings starting with '###'.",
     "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
     "SELF-REVIEW (silent): remove repetition, replace generic claims with concrete UI/mechanism, ensure at least one trade-off and one risk where relevant.",
+    "SILENT SELF-CHECK: rewrite your answer internally to remove fluff, remove repetition, and add concrete UI/mechanism + trade-offs + risks. Do NOT show the self-check.",
     "For design tasks, always include a concrete deliverables list (screens/components/copy) when the key allows it.",
     STRICT_MODE
       ? "ANTI-FLUFF CHECK: If a sentence could fit any product, rewrite it with specifics."
@@ -595,6 +610,16 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
                   STRICT_MODE
                     ? "Be opinionated: pick 1–2 best bets and explicitly reject weaker alternatives."
                     : null,
+                  "Before you answer, do a SILENT SELF-CHECK and revise your own text internally.",
+                  "Do NOT show the self-check.",
+                  "Self-check rules:",
+                  "- Remove repetition and rephrasing. Each bullet must add new information.",
+                  "- Replace generic claims with: mechanism → UI element → expected user behavior.",
+                  "- Add at least 1 concrete UI detail per section (unless impossible).",
+                  "- Add at least 1 trade-off and 1 risk where applicable.",
+                  "- Ensure options (if present) are genuinely different; reject at least one alternative with a reason.",
+                  "- Do NOT invent numbers or % deltas unless explicitly provided by the user/context.",
+                  "Then output only the final revised answer.",
                 ].join("\n"),
               },
               { role: "user", content: prompt },
@@ -716,6 +741,16 @@ async function runDeeper({
                   STRICT_MODE
                     ? "Be opinionated: pick 1–2 best bets and explicitly reject weaker alternatives."
                     : null,
+                  "Before you answer, do a SILENT SELF-CHECK and revise your own text internally.",
+                  "Do NOT show the self-check.",
+                  "Self-check rules:",
+                  "- Remove repetition and rephrasing. Each bullet must add new information.",
+                  "- Replace generic claims with: mechanism → UI element → expected user behavior.",
+                  "- Add at least 1 concrete UI detail per section (unless impossible).",
+                  "- Add at least 1 trade-off and 1 risk where applicable.",
+                  "- Ensure options (if present) are genuinely different; reject at least one alternative with a reason.",
+                  "- Do NOT invent numbers or % deltas unless explicitly provided by the user/context.",
+                  "Then output only the final revised answer.",
                 ]
                   .filter(Boolean)
                   .join("\n"),
@@ -837,6 +872,16 @@ async function runVerify({
                   STRICT_MODE
                     ? "Be opinionated: pick 1–2 best bets and explicitly reject weaker alternatives."
                     : null,
+                  "Before you answer, do a SILENT SELF-CHECK and revise your own text internally.",
+                  "Do NOT show the self-check.",
+                  "Self-check rules:",
+                  "- Remove repetition and rephrasing. Each bullet must add new information.",
+                  "- Replace generic claims with: mechanism → UI element → expected user behavior.",
+                  "- Add at least 1 concrete UI detail per section (unless impossible).",
+                  "- Add at least 1 trade-off and 1 risk where applicable.",
+                  "- Ensure options (if present) are genuinely different; reject at least one alternative with a reason.",
+                  "- Do NOT invent numbers or % deltas unless explicitly provided by the user/context.",
+                  "Then output only the final revised answer.",
                 ]
                   .filter(Boolean)
                   .join("\n"),
