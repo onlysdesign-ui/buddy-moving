@@ -6,51 +6,54 @@ const {
 describe("mergeCaseFile", () => {
   it("merges arrays without duplicates and updates existing entries", () => {
     const base = createEmptyCaseFile();
-    base.success_metrics = [
-      { name: "Activation", type: "leading", how_to_measure: "Signup rate", target: "30%" },
+    base.success_criteria = [
+      { criterion: "Reduce planning confusion", type: "must", how_to_measure_later: "Interview feedback" },
     ];
 
     const patch = {
-      success_metrics: [
-        { name: "Activation", how_to_measure: "Activated accounts", target: "35%" },
-        { name: "Retention", type: "lagging", how_to_measure: "Day-30 retention", target: "20%" },
+      success_criteria: [
+        { criterion: "Reduce planning confusion", how_to_measure_later: "Support tickets tagged confusion" },
+        { criterion: "Users feel in control", type: "should", how_to_measure_later: "Post-task survey sentiment" },
       ],
     };
 
     const merged = mergeCaseFile(base, patch);
 
-    expect(merged.success_metrics).toHaveLength(2);
-    const activation = merged.success_metrics.find((item) => item.name === "Activation");
-    expect(activation).toEqual({
-      name: "Activation",
-      type: "leading",
-      how_to_measure: "Activated accounts",
-      target: "35%",
+    expect(merged.success_criteria).toHaveLength(2);
+    const updated = merged.success_criteria.find(
+      (item) => item.criterion === "Reduce planning confusion"
+    );
+    expect(updated).toEqual({
+      criterion: "Reduce planning confusion",
+      type: "must",
+      how_to_measure_later: "Support tickets tagged confusion",
     });
   });
 
   it("ignores empty fields and merges string arrays uniquely", () => {
     const base = createEmptyCaseFile();
-    base.task_summary.short = "Build a moving planner";
-    base.task_summary.assumptions = ["Users have limited time"];
+    base.task_summary.problem = "Build a moving planner";
+    base.task_summary.non_goals = ["Home buying flows"];
+    base.assumptions = [{ text: "Users have limited time", impact: "Need speed", confidence: "medium" }];
 
     const patch = {
       task_summary: {
-        short: "",
-        assumptions: ["Users have limited time", "Mobile-first usage"],
+        problem: "",
+        non_goals: ["Home buying flows", "Corporate relocations"],
       },
-      constraints: {
-        product_constraints: [],
-      },
+      assumptions: [
+        { text: "Users have limited time", impact: "Need speed", confidence: "medium" },
+        { text: "Mobile-first usage", impact: "Prioritize phone UX", confidence: "high" },
+      ],
     };
 
     const merged = mergeCaseFile(base, patch);
 
-    expect(merged.task_summary.short).toBe("Build a moving planner");
-    expect(merged.task_summary.assumptions).toEqual([
-      "Users have limited time",
-      "Mobile-first usage",
+    expect(merged.task_summary.problem).toBe("Build a moving planner");
+    expect(merged.task_summary.non_goals).toEqual([
+      "Home buying flows",
+      "Corporate relocations",
     ]);
-    expect(merged.constraints.product_constraints).toEqual([]);
+    expect(merged.assumptions).toHaveLength(2);
   });
 });

@@ -1,34 +1,45 @@
 const DEFAULT_CASE_FILE = {
   task_summary: {
-    short: "",
-    key_goal: "",
-    scope: "",
-    assumptions: [],
+    problem: "",
+    outcome: "",
+    non_goals: [],
   },
-  constraints: {
-    product_constraints: [],
-    technical_constraints: [],
-    time_constraints: [],
-    legal_or_policy_constraints: [],
+  assumptions: [],
+  primary_focus: {
+    segment: "",
+    reasoning: [],
+    confidence: "",
   },
-  audience_model: {
-    primary_users: [],
-    secondary_users: [],
-    jobs_to_be_done: [],
+  segments: {
+    primary: {
+      who: "",
+      goals: [],
+      pains: [],
+      triggers: [],
+    },
+    secondary: [],
   },
-  key_scenarios: [],
-  success_metrics: [],
-  risks: [],
-  open_questions: [],
-  recommended_approach: {
+  hypotheses: [],
+  scenarios: [],
+  success_criteria: [],
+  solution_options: {
     option_a: {
       name: "",
       description: "",
       why: [],
       tradeoffs: [],
+      risks: [],
     },
     option_b: null,
+    option_c: null,
+  },
+  recommendation: {
+    chosen_option: "",
+    why: [],
+    tradeoffs: [],
+    first_week_plan: [],
     first_validation_steps: [],
+    if_assumptions_wrong: [],
   },
 };
 
@@ -135,34 +146,33 @@ function mergeArrayByKey(targetArray, incomingArray, keyField, mergeKeys = {}) {
   return result;
 }
 
-function mergeRecommendedApproach(target, incoming) {
+function mergeSolutionOption(target, incoming) {
+  if (!incoming || typeof incoming !== "object") return target;
+  return mergeObjectFields(target, incoming, {
+    mergeKeys: {
+      why: "string",
+      tradeoffs: "string",
+      risks: "string",
+    },
+  });
+}
+
+function mergeSolutionOptions(target, incoming) {
   if (!incoming || typeof incoming !== "object") return target;
   const output = { ...(target || {}) };
 
   if (incoming.option_a && typeof incoming.option_a === "object") {
-    output.option_a = mergeObjectFields(output.option_a, incoming.option_a, {
-      mergeKeys: {
-        why: "string",
-        tradeoffs: "string",
-      },
-    });
+    output.option_a = mergeSolutionOption(output.option_a, incoming.option_a);
   }
 
   if (incoming.option_b && typeof incoming.option_b === "object") {
     if (!output.option_b) output.option_b = {};
-    output.option_b = mergeObjectFields(output.option_b, incoming.option_b, {
-      mergeKeys: {
-        why: "string",
-        tradeoffs: "string",
-      },
-    });
+    output.option_b = mergeSolutionOption(output.option_b, incoming.option_b);
   }
 
-  if (Array.isArray(incoming.first_validation_steps)) {
-    output.first_validation_steps = mergeStringArray(
-      output.first_validation_steps,
-      incoming.first_validation_steps
-    );
+  if (incoming.option_c && typeof incoming.option_c === "object") {
+    if (!output.option_c) output.option_c = {};
+    output.option_c = mergeSolutionOption(output.option_c, incoming.option_c);
   }
 
   return output;
@@ -178,79 +188,88 @@ function mergeCaseFile(currentCaseFile, patch) {
     nextCaseFile.task_summary = mergeObjectFields(
       base.task_summary,
       patch.task_summary,
-      { mergeKeys: { assumptions: "string" } }
+      { mergeKeys: { non_goals: "string" } }
     );
   }
 
-  if (patch.constraints) {
-    nextCaseFile.constraints = mergeObjectFields(
-      base.constraints,
-      patch.constraints,
-      {
-        mergeKeys: {
-          product_constraints: "string",
-          technical_constraints: "string",
-          time_constraints: "string",
-          legal_or_policy_constraints: "string",
-        },
-      }
+  if (Array.isArray(patch.assumptions)) {
+    nextCaseFile.assumptions = mergeArrayByKey(
+      base.assumptions,
+      patch.assumptions,
+      "text"
     );
   }
 
-  if (patch.audience_model) {
-    const audience = base.audience_model || {};
-    const incoming = patch.audience_model || {};
-    nextCaseFile.audience_model = {
-      ...audience,
-      jobs_to_be_done: mergeStringArray(audience.jobs_to_be_done, incoming.jobs_to_be_done),
-      primary_users: mergeArrayByKey(
-        audience.primary_users,
-        incoming.primary_users,
-        "who",
-        { goals: "string", pains: "string" }
-      ),
-      secondary_users: mergeArrayByKey(
-        audience.secondary_users,
-        incoming.secondary_users,
+  if (patch.primary_focus) {
+    nextCaseFile.primary_focus = mergeObjectFields(
+      base.primary_focus,
+      patch.primary_focus,
+      { mergeKeys: { reasoning: "string" } }
+    );
+  }
+
+  if (patch.segments) {
+    const baseSegments = base.segments || {};
+    const incoming = patch.segments || {};
+    nextCaseFile.segments = {
+      primary: mergeObjectFields(baseSegments.primary, incoming.primary, {
+        mergeKeys: { goals: "string", pains: "string", triggers: "string" },
+      }),
+      secondary: mergeArrayByKey(
+        baseSegments.secondary,
+        incoming.secondary,
         "who",
         { goals: "string", pains: "string" }
       ),
     };
   }
 
-  if (patch.key_scenarios) {
-    nextCaseFile.key_scenarios = mergeArrayByKey(
-      base.key_scenarios,
-      patch.key_scenarios,
+  if (Array.isArray(patch.hypotheses)) {
+    nextCaseFile.hypotheses = mergeArrayByKey(
+      base.hypotheses,
+      patch.hypotheses,
+      "statement",
+      { depends_on: "string" }
+    );
+  }
+
+  if (Array.isArray(patch.scenarios)) {
+    nextCaseFile.scenarios = mergeArrayByKey(
+      base.scenarios,
+      patch.scenarios,
       "name",
       { steps: "string", success_criteria: "string" }
     );
   }
 
-  if (patch.success_metrics) {
-    nextCaseFile.success_metrics = mergeArrayByKey(
-      base.success_metrics,
-      patch.success_metrics,
-      "name"
+  if (Array.isArray(patch.success_criteria)) {
+    nextCaseFile.success_criteria = mergeArrayByKey(
+      base.success_criteria,
+      patch.success_criteria,
+      "criterion"
     );
   }
 
-  if (patch.risks) {
-    nextCaseFile.risks = mergeArrayByKey(base.risks, patch.risks, "name");
-  }
-
-  if (patch.open_questions) {
-    nextCaseFile.open_questions = mergeArrayByKey(
-      base.open_questions,
-      patch.open_questions,
-      "question"
+  if (patch.solution_options) {
+    nextCaseFile.solution_options = mergeSolutionOptions(
+      base.solution_options,
+      patch.solution_options
     );
   }
 
-  if (patch.recommended_approach) {
-    nextCaseFile.recommended_approach = mergeRecommendedApproach(
-      base.recommended_approach,
-      patch.recommended_approach
+  if (patch.recommendation) {
+    nextCaseFile.recommendation = mergeObjectFields(
+      base.recommendation,
+      patch.recommendation,
+      {
+        mergeKeys: {
+          why: "string",
+          tradeoffs: "string",
+          first_week_plan: "string",
+          first_validation_steps: "string",
+          if_assumptions_wrong: "string",
+        },
+      }
     );
   }
 
@@ -270,7 +289,11 @@ async function updateCaseFile(cardType, cardText, caseFile, task, context) {
     "- Do NOT restate the entire caseFile.",
     "- Omit empty fields; do not include nulls or empty arrays.",
     "- Avoid duplicates; reuse existing entities where possible.",
+    "- Assumptions unique by text; hypotheses unique by statement; scenarios unique by name; success_criteria unique by criterion.",
     "- Keep output short (<= 500 tokens).",
+    "",
+    "caseFile schema:",
+    JSON.stringify(createEmptyCaseFile()),
     "",
     `cardType: ${cardType}`,
     "cardText:",
