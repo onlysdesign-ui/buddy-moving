@@ -39,6 +39,10 @@ let currentAnalysis = DEFAULT_KEYS.reduce((acc, key) => {
   acc[key] = "";
   return acc;
 }, {});
+let cardStatuses = DEFAULT_KEYS.reduce((acc, key) => {
+  acc[key] = { status: "idle", error: null };
+  return acc;
+}, {});
 let activeStreamController = null;
 let activeStreamId = 0;
 let progressState = { completed: 0, total: 0 };
@@ -112,7 +116,24 @@ const ensureCard = (key, { moveToEnd = false } = {}) => {
   let card = elements.resultsList.querySelector(`[data-key="${key}"]`);
   if (!card) {
     card = createResultCard(key);
-    elements.resultsList.appendChild(card);
+    if (moveToEnd) {
+      elements.resultsList.appendChild(card);
+    } else {
+      const keyIndex = DEFAULT_KEYS.indexOf(key);
+      const cards = Array.from(
+        elements.resultsList.querySelectorAll("[data-key]"),
+      );
+      const nextCard = cards.find((existing) => {
+        const existingKey = existing.dataset.key;
+        const existingIndex = DEFAULT_KEYS.indexOf(existingKey);
+        return existingIndex > keyIndex;
+      });
+      if (nextCard) {
+        elements.resultsList.insertBefore(card, nextCard);
+      } else {
+        elements.resultsList.appendChild(card);
+      }
+    }
     return card;
   }
   if (moveToEnd) {
@@ -126,6 +147,14 @@ const setCardLoading = (
   isLoading,
   { placeholder = "Loading…", showSkeleton = false, statusText } = {},
 ) => {
+  if (cardStatuses[key]) {
+    if (isLoading) {
+      cardStatuses[key].status = "loading";
+      cardStatuses[key].error = null;
+    } else if (cardStatuses[key].status === "loading") {
+      cardStatuses[key].status = "done";
+    }
+  }
   const card = ensureCard(key);
   if (!card) return;
   card.classList.remove("error");
@@ -148,6 +177,10 @@ const updateCard = (key, value) => {
     currentAnalysis[key] = "";
   }
   currentAnalysis[key] = value || "";
+  if (cardStatuses[key]) {
+    cardStatuses[key].status = "done";
+    cardStatuses[key].error = null;
+  }
   const card = ensureCard(key);
   if (!card) return;
   const body = card.querySelector(".card-content");
@@ -162,6 +195,10 @@ const updateCard = (key, value) => {
 };
 
 const setCardError = (key, message, details) => {
+  if (cardStatuses[key]) {
+    cardStatuses[key].status = "error";
+    cardStatuses[key].error = { message, details };
+  }
   const card = ensureCard(key);
   if (!card) return;
   const body = card.querySelector(".card-content");
@@ -183,6 +220,10 @@ const resetCardsForLoading = () => {
   }
   DEFAULT_KEYS.forEach((key) => {
     currentAnalysis[key] = "";
+    if (cardStatuses[key]) {
+      cardStatuses[key].status = "idle";
+      cardStatuses[key].error = null;
+    }
   });
   progressState = { completed: 0, total: 0 };
 };
@@ -285,11 +326,10 @@ const streamAnalysis = async ({
       if (!data) return;
       try {
         const payload = JSON.parse(data);
-        if (payload?.key) {
+        if (onError) {
+          onError(payload);
+        } else if (payload?.key) {
           setCardError(payload.key, payload.error, payload.details);
-          if (onError) {
-            onError(payload);
-          }
         }
         showToast(payload?.error || "Analysis failed.", "error");
       } catch (error) {
@@ -358,8 +398,6 @@ const analyzeTask = async () => {
 
   setStatus(true);
   resetCardsForLoading();
-  let sawKeyStart = false;
-  let fallbackSkeletonsCreated = false;
 
   try {
     await streamAnalysis({
@@ -369,7 +407,6 @@ const analyzeTask = async () => {
       keys: DEFAULT_KEYS,
       onStatus: (payload) => {
         if (payload.status === "key-start" && payload.key) {
-          sawKeyStart = true;
           setCardLoading(payload.key, true, {
             showSkeleton: true,
             statusText: "Analyzing...",
@@ -384,15 +421,6 @@ const analyzeTask = async () => {
               total: payload.total,
             };
             updateProgress(progressState.completed, progressState.total);
-          }
-          if (!sawKeyStart && !fallbackSkeletonsCreated) {
-            DEFAULT_KEYS.forEach((key) => {
-              setCardLoading(key, true, {
-                showSkeleton: true,
-                statusText: "Analyzing...",
-              });
-            });
-            fallbackSkeletonsCreated = true;
           }
           return;
         }
@@ -412,6 +440,11 @@ const analyzeTask = async () => {
       },
       onKey: (payload) => {
         updateCard(payload.key, payload.value);
+      },
+      onError: (payload) => {
+        if (payload?.key) {
+          setCardError(payload.key, payload.error, payload.details);
+        }
       },
     });
     showToast("Analysis complete.");
