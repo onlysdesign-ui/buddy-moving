@@ -16,13 +16,51 @@ const port = process.env.PORT || 3000;
 console.log("OPENAI_API_KEY:", OPENAI_API_KEY ? "set" : "missing");
 console.log("OPENAI_MODEL:", OPENAI_MODEL);
 
+// ------------------------------
+// CORS (no deps)
+// ------------------------------
+
+// Разрешаем твой GitHub Pages + локальную разработку
+const ALLOWED_ORIGINS = new Set([
+  "https://onlysdesign-ui.github.io",
+  "http://localhost:3000",
+  "http://localhost:5173",
+]);
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (origin && ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Vary", "Origin");
+  }
+
+  // Разрешаем нужные методы и заголовки
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  // Если вдруг в будущем понадобится куки - можно включить:
+  // res.setHeader("Access-Control-Allow-Credentials", "true");
+
+  // Preflight запросы браузера (OPTIONS) должны возвращать 204
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+
+  next();
+});
+
+// ------------------------------
+// Middleware
+// ------------------------------
 app.use(express.json());
 
+// ------------------------------
+// Static dist fallback (optional)
+// ------------------------------
 const frontendDistPath = path.join(__dirname, "../frontend/dist");
 const rootDistPath = path.join(__dirname, "../dist");
-const distPath = fs.existsSync(frontendDistPath)
-  ? frontendDistPath
-  : rootDistPath;
+const distPath = fs.existsSync(frontendDistPath) ? frontendDistPath : rootDistPath;
 const indexPath = path.join(distPath, "index.html");
 
 if (!fs.existsSync(indexPath)) {
@@ -32,6 +70,9 @@ if (!fs.existsSync(indexPath)) {
 
 app.use(express.static(distPath));
 
+// ------------------------------
+// OpenAI response parsing
+// ------------------------------
 const requiredAnalysisKeys = [
   "audience",
   "metrics",
@@ -66,7 +107,9 @@ function parseAnalysisResponse(content) {
   return analysis;
 }
 
-
+// ------------------------------
+// Routes
+// ------------------------------
 app.get("/health", (req, res) => {
   res.json({
     status: "ok",
@@ -86,7 +129,9 @@ app.post("/analyze", async (req, res) => {
     }
 
     if (!openaiClient) {
-      return res.status(500).json({ error: "AI is not configured (missing env vars)" });
+      return res
+        .status(500)
+        .json({ error: "AI is not configured (missing env vars)" });
     }
 
     const prompt = [
@@ -118,10 +163,19 @@ app.post("/analyze", async (req, res) => {
     return res.json({ analysis });
   } catch (err) {
     console.error("OpenAI request failed:", err);
-    return res.status(500).json({ error: "OpenAI request failed" });
+
+    // ВАЖНО: возвращаем детали, чтобы фронт мог показать ошибку,
+    // а не только "Failed to fetch"
+    return res.status(500).json({
+      error: "OpenAI request failed",
+      details: err?.message ? String(err.message) : String(err),
+    });
   }
 });
 
+// ------------------------------
+// SPA fallback (optional)
+// ------------------------------
 app.get("*", (req, res) => {
   if (!fs.existsSync(indexPath)) {
     return res.status(503).send(`<!doctype html>
@@ -133,7 +187,7 @@ app.get("*", (req, res) => {
     <style>
       body {
         margin: 0;
-        font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
         background: #0b0c10;
         color: #f5f5f6;
         display: flex;
