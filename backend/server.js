@@ -205,18 +205,48 @@ function buildContextSummary(currentAnalysis, keyToSkip) {
   return lines.length ? lines.join("\n") : "(none)";
 }
 
-async function runWithTimeout(fn, { timeoutMs = OPENAI_TIMEOUT_MS, label }) {
+async function runWithTimeout(fn, { timeoutMs = OPENAI_TIMEOUT_MS, label, signal }) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timeoutError = new Error(
+    `${label || "OpenAI request"} timed out after ${timeoutMs}ms`
+  );
+  timeoutError.name = "TimeoutError";
+
+  const abortHandler = () => controller.abort();
+  if (signal) {
+    if (signal.aborted) {
+      controller.abort();
+    } else {
+      signal.addEventListener("abort", abortHandler, { once: true });
+    }
+  }
+
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort();
+      reject(timeoutError);
+    }, timeoutMs);
+  });
+
+  const requestPromise = fn(controller.signal);
+
   try {
-    return await fn(controller.signal);
+    return await Promise.race([requestPromise, timeoutPromise]);
   } catch (error) {
     if (error?.name === "AbortError") {
-      throw new Error(`${label || "OpenAI request"} timed out after ${timeoutMs}ms`);
+      const abortError = new Error(`${label || "OpenAI request"} aborted`);
+      abortError.name = "AbortError";
+      throw abortError;
     }
     throw error;
   } finally {
-    clearTimeout(timeoutId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    if (signal) {
+      signal.removeEventListener("abort", abortHandler);
+    }
   }
 }
 
@@ -234,7 +264,7 @@ function logOpenAIError(key, err) {
   });
 }
 
-async function runKeyCompletion({ key, task, context, language }) {
+async function runKeyCompletion({ key, task, context, language, signal }) {
   const prompt = buildKeyPrompt({ key, task, context, language });
   let response;
   try {
@@ -258,7 +288,7 @@ async function runKeyCompletion({ key, task, context, language }) {
           },
           { signal }
         ),
-      { label: `OpenAI ${key} request` }
+      { label: `OpenAI ${key} request`, signal }
     );
   } catch (error) {
     logOpenAIError(key, error);
@@ -274,7 +304,7 @@ async function runKeyCompletion({ key, task, context, language }) {
   return content.trim();
 }
 
-async function runDeeper({ key, task, context, language, currentAnalysis }) {
+async function runDeeper({ key, task, context, language, currentAnalysis, signal }) {
   const otherContext = buildContextSummary(currentAnalysis, key);
   const prompt = [
     "You are a senior product designer + product strategist.",
@@ -320,7 +350,7 @@ async function runDeeper({ key, task, context, language, currentAnalysis }) {
           },
           { signal }
         ),
-      { label: `OpenAI deeper ${key} request` }
+      { label: `OpenAI deeper ${key} request`, signal }
     );
   } catch (error) {
     logOpenAIError(key, error);
@@ -336,7 +366,7 @@ async function runDeeper({ key, task, context, language, currentAnalysis }) {
   return content.trim();
 }
 
-async function runVerify({ key, task, context, language, currentAnalysis, value }) {
+async function runVerify({ key, task, context, language, currentAnalysis, value, signal }) {
   const otherContext = buildContextSummary(currentAnalysis, key);
   const prompt = [
     "You are a senior product designer + product strategist.",
@@ -382,7 +412,7 @@ async function runVerify({ key, task, context, language, currentAnalysis, value 
           },
           { signal }
         ),
-      { label: `OpenAI verify ${key} request` }
+      { label: `OpenAI verify ${key} request`, signal }
     );
   } catch (error) {
     logOpenAIError(key, error);
@@ -475,11 +505,17 @@ app.post("/analyze/stream", async (req, res) => {
   res.flushHeaders?.();
 
   let closed = false;
+  const streamAbortController = new AbortController();
+  let heartbeatId;
   req.on("close", () => {
     closed = true;
+    streamAbortController.abort();
+    if (heartbeatId) {
+      clearInterval(heartbeatId);
+    }
   });
 
-  const heartbeatId = setInterval(() => {
+  heartbeatId = setInterval(() => {
     if (!closed) {
       res.write(": ping\n\n");
     }
@@ -495,16 +531,33 @@ app.post("/analyze/stream", async (req, res) => {
   try {
     for (const key of analysisKeys) {
       if (closed) break;
+      console.log(`[stream] start key=${key}`);
+      writeSseEvent(res, "status", {
+        status: "key-start",
+        key,
+        completed,
+        total: analysisKeys.length,
+      });
       try {
-        const value = await runKeyCompletion({ key, task, context, language });
+        const value = await runKeyCompletion({
+          key,
+          task,
+          context,
+          language,
+          signal: streamAbortController.signal,
+        });
         writeSseEvent(res, "key", { key, value, status: "ok" });
+        console.log(`[stream] done key=${key} ok`);
       } catch (error) {
+        if (closed) break;
+        const details = error?.message ? String(error.message) : String(error);
         console.error(`OpenAI request failed for ${key}:`, error);
         writeSseEvent(res, "error", {
           key,
           error: "OpenAI request failed",
-          details: error?.message ? String(error.message) : String(error),
+          details,
         });
+        console.log(`[stream] done key=${key} error=${details}`);
       } finally {
         if (closed) break;
         completed += 1;
