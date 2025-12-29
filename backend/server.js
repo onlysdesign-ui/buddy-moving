@@ -82,30 +82,68 @@ const requiredAnalysisKeys = [
   "approaches",
 ];
 
+function extractJSONObject(text) {
+  if (typeof text !== "string") return null;
+
+  // Иногда бывают невидимые символы в начале
+  const cleaned = text.trim().replace(/^\uFEFF/, "");
+
+  const first = cleaned.indexOf("{");
+  const last = cleaned.lastIndexOf("}");
+
+  if (first === -1 || last === -1 || last <= first) return null;
+
+  return cleaned.slice(first, last + 1);
+}
+
 function parseAnalysisResponse(content) {
-  let parsed;
+  const raw = typeof content === "string" ? content : "";
+
+  // 1) Сначала пытаемся парсить как есть
   try {
-    parsed = JSON.parse(content);
-  } catch (error) {
-    throw new Error("Failed to parse OpenAI JSON response");
-  }
+    const parsed = JSON.parse(raw);
 
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("OpenAI response was not a JSON object");
-  }
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("OpenAI response was not a JSON object");
+    }
 
+    return validateAnalysis(parsed);
+  } catch (e) {
+    // 2) Если не получилось - попробуем вытащить JSON из строки
+    const extracted = extractJSONObject(raw);
+
+    if (!extracted) {
+      // Логируем реальный ответ (обрезаем, чтобы не спамить)
+      console.error("❌ OpenAI returned non-JSON content:", raw.slice(0, 1000));
+      throw new Error("Failed to parse OpenAI JSON response (no JSON object found)");
+    }
+
+    try {
+      const parsed = JSON.parse(extracted);
+      return validateAnalysis(parsed);
+    } catch (e2) {
+      console.error("❌ OpenAI returned broken JSON:", extracted.slice(0, 1000));
+      throw new Error("Failed to parse OpenAI JSON response (broken JSON)");
+    }
+  }
+}
+
+function validateAnalysis(parsed) {
   const analysis = {};
 
   for (const key of requiredAnalysisKeys) {
     const value = parsed[key];
+
     if (typeof value !== "string" || value.trim().length === 0) {
       throw new Error(`OpenAI response missing or invalid field: ${key}`);
     }
+
     analysis[key] = value.trim();
   }
 
   return analysis;
 }
+
 
 // ------------------------------
 // Routes
@@ -234,19 +272,32 @@ Prefer approaches that are testable quickly with prototypes.
 Now produce the JSON object.
 `.trim();
 
-    const data = await openaiClient.chat.completions.create({
-      model: OPENAI_MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.4,
-      max_tokens: 600,
-      response_format: { type: "json_object" },
-    });
+   const data = await openaiClient.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      {
+        role: "system",
+        content: [
+          "You are a senior product designer + product strategist.",
+          "Return STRICT JSON only. No markdown, no prose.",
+          "Output must be a single JSON object with keys:",
+          "audience, metrics, risks, questions, scenarios, approaches.",
+          "Each value must be a concise string."
+        ].join("\n")
+      },
+      { role: "user", content: prompt },
+    ],
+    temperature: 0.4,
+    max_tokens: 700,
+    response_format: { type: "json_object" },
+});
 
     const content = data?.choices?.[0]?.message?.content;
     if (!content) {
       throw new Error("OpenAI response was empty");
     }
-
+    
+    console.log("🧠 OpenAI raw content:", String(content).slice(0, 1200));
     const analysis = parseAnalysisResponse(content);
 
     return res.json({ analysis });
