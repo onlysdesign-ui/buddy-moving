@@ -6,11 +6,15 @@
   "type": "commonjs",
   "scripts": {
     "start": "node server.js",
-    "analyze:test": "node scripts/analyze-test.js"
+    "analyze:test": "node scripts/analyze-test.js",
+    "test": "jest"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
     "express": "^4.19.2",
     "openai": "^4.78.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0"
   }
 }

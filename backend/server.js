@@ -10,6 +10,11 @@ const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 30000;
 const openaiClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
+const {
+  configureCaseFileUpdater,
+  createEmptyCaseFile,
+  updateCaseFile,
+} = require("./caseFile/updateCaseFile");
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -168,20 +173,26 @@ function resolveLanguage(text) {
   return "en";
 }
 
-function buildKeyPrompt({ key, task, context, language }) {
+function buildKeyPrompt({ key, task, context, language, caseFile }) {
   const languageLabel = languageLabels[language] || "English";
+  const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
   return [
     "You are a senior product designer + product strategist.",
     `Respond only for the "${key}" section.`,
     `Write in ${languageLabel}.`,
     "Use short paragraphs and bullet-like formatting inside the response (use '-' for bullets).",
     "Avoid vague language; be concrete and actionable.",
+    "Use the Case File to stay consistent. Do not invent new entities unless required.",
+    "Prefer updating or extending existing entities in the Case File.",
     "",
     "TASK:",
     task,
     "",
     "CONTEXT:",
     context || "(none)",
+    "",
+    "CASE FILE (JSON):",
+    serializedCaseFile || "(none)",
     "",
     "KEY SPECIFICATION:",
     keyInstructions[key],
@@ -291,6 +302,13 @@ async function runWithTimeout(label, timeoutMs, fn, { signal } = {}) {
   }
 }
 
+configureCaseFileUpdater({
+  client: openaiClient,
+  model: OPENAI_MODEL,
+  timeoutMs: OPENAI_TIMEOUT_MS,
+  runWithTimeout,
+});
+
 function logOpenAIError(key, err) {
   const status = err?.status;
   const code = err?.code;
@@ -305,8 +323,8 @@ function logOpenAIError(key, err) {
   });
 }
 
-async function runKeyCompletion({ key, task, context, language, signal }) {
-  const prompt = buildKeyPrompt({ key, task, context, language });
+async function runKeyCompletion({ key, task, context, language, caseFile, signal }) {
+  const prompt = buildKeyPrompt({ key, task, context, language, caseFile });
   const startTime = Date.now();
   console.log(`[openai] start key=${key}`);
   let response;
@@ -591,6 +609,7 @@ app.post("/analyze/stream", async (req, res) => {
   });
 
   let completed = 0;
+  let caseFile = createEmptyCaseFile();
   try {
     for (const key of keysToAnalyze) {
       if (clientGone) {
@@ -609,10 +628,22 @@ app.post("/analyze/stream", async (req, res) => {
           task,
           context,
           language,
+          caseFile,
         });
 
         writeSseEvent(res, "key", { key, value, status: "ok" });
         console.log(`[stream] done key=${key} ok`);
+
+        try {
+          caseFile = await updateCaseFile(key, value, caseFile, task, context);
+          if (process.env.NODE_ENV !== "production") {
+            console.log(
+              `[casefile] updated after ${key}: ${JSON.stringify(caseFile)}`
+            );
+          }
+        } catch (updateError) {
+          console.warn(`[casefile] update failed after ${key}:`, updateError);
+        }
       } catch (error) {
         if (clientGone) {
           return;
