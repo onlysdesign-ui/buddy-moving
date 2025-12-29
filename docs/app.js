@@ -10,29 +10,29 @@ const ANALYSIS_KEYS = [
 const STORAGE_KEYS = {
   task: "buddyMoving.task",
   context: "buddyMoving.context",
+  contextUpdatedAt: "buddyMoving.contextUpdatedAt",
 };
 
 const elements = {
   task: document.getElementById("task"),
   context: document.getElementById("context"),
+  contextIndicator: document.getElementById("context-indicator"),
+  contextPanel: document.getElementById("context-panel"),
   analyze: document.getElementById("analyze"),
   status: document.getElementById("status"),
   statusText: document.getElementById("status-text"),
   toast: document.getElementById("toast"),
-  results: document.querySelector(".results"),
-  cards: ANALYSIS_KEYS.reduce((acc, key) => {
-    acc[key] = {
-      container: document.querySelector(`.card[data-key="${key}"]`),
-      value: document.getElementById(key),
-    };
-    return acc;
-  }, {}),
+  tabs: document.getElementById("result-tabs"),
+  resultCard: document.getElementById("result-card"),
+  resultTitle: document.getElementById("result-title"),
+  resultBody: document.getElementById("result-body"),
 };
 
 let currentAnalysis = ANALYSIS_KEYS.reduce((acc, key) => {
   acc[key] = "";
   return acc;
 }, {});
+let selectedKey = "audience";
 let activeStreamController = null;
 let activeStreamId = 0;
 
@@ -55,11 +55,11 @@ const setStatus = (active, message = "Analyzing…") => {
 };
 
 const setCardLoading = (key, isLoading, placeholder = "Loading…") => {
-  const card = elements.cards[key];
-  if (!card) return;
-  card.container.classList.toggle("loading", isLoading);
-  if (isLoading) {
-    card.value.textContent = placeholder;
+  if (!elements.resultCard) return;
+  if (key !== selectedKey) return;
+  elements.resultCard.classList.toggle("loading", isLoading);
+  if (isLoading && elements.resultBody) {
+    elements.resultBody.textContent = placeholder;
   }
 };
 
@@ -72,18 +72,19 @@ const setCopyButtonState = (button, isCopied) => {
 };
 
 const updateCard = (key, value) => {
-  const card = elements.cards[key];
-  if (!card) return;
-  card.value.textContent = value || "No details yet.";
-  card.container.classList.remove("loading");
   currentAnalysis[key] = value || "";
+  if (key !== selectedKey) return;
+  if (elements.resultBody) {
+    elements.resultBody.textContent = value || "No details yet.";
+  }
+  elements.resultCard?.classList.remove("loading");
 };
 
 const resetCardsForLoading = () => {
   ANALYSIS_KEYS.forEach((key) => {
-    setCardLoading(key, true);
     currentAnalysis[key] = "";
   });
+  setCardLoading(selectedKey, true);
 };
 
 const updateProgress = (completed, total) => {
@@ -142,7 +143,7 @@ const streamAnalysis = async ({ task, context, signal }) => {
 
   const finishPendingCards = (message) => {
     ANALYSIS_KEYS.forEach((key) => {
-      if (elements.cards[key].container.classList.contains("loading")) {
+      if (key === selectedKey) {
         updateCard(key, message);
       }
     });
@@ -156,6 +157,7 @@ const streamAnalysis = async ({ task, context, signal }) => {
       try {
         const payload = JSON.parse(data);
         updateCard(payload.key, payload.value);
+        setSelectedKey(payload.key);
         if (!hasProgressEvents) {
           completed += 1;
           updateProgress(completed, total);
@@ -192,6 +194,7 @@ const streamAnalysis = async ({ task, context, signal }) => {
         const payload = JSON.parse(data);
         if (payload?.key) {
           updateCard(payload.key, `Error: ${payload.error || "Failed"}`);
+          setSelectedKey(payload.key);
         }
         showToast(payload?.error || "Analysis failed.", "error");
         if (!hasProgressEvents) {
@@ -266,6 +269,7 @@ const analyzeTask = async () => {
   activeStreamController = controller;
 
   setStatus(true);
+  setSelectedKey("audience");
   resetCardsForLoading();
 
   try {
@@ -293,21 +297,21 @@ const handleCardAction = async (action, key, cardElement) => {
     return;
   }
 
-    if (action === "copy") {
-      const value = currentAnalysis[key] || elements.cards[key].value.textContent;
-      try {
-        await navigator.clipboard.writeText(value);
-        const button = cardElement.querySelector(`[data-action="copy"]`);
-        if (button) {
-          setCopyButtonState(button, true);
-          setTimeout(() => {
-            setCopyButtonState(button, false);
-          }, 1000);
-        }
-      } catch (error) {
-        showToast("Copy failed. Please try again.", "error");
+  if (action === "copy") {
+    const value = currentAnalysis[key] || elements.resultBody?.textContent || "";
+    try {
+      await navigator.clipboard.writeText(value);
+      const button = cardElement.querySelector(`[data-action="copy"]`);
+      if (button) {
+        setCopyButtonState(button, true);
+        setTimeout(() => {
+          setCopyButtonState(button, false);
+        }, 1000);
       }
-      return;
+    } catch (error) {
+      showToast("Copy failed. Please try again.", "error");
+    }
+    return;
   }
 
   const endpoint =
@@ -350,11 +354,17 @@ const handleCardAction = async (action, key, cardElement) => {
 const restoreInputs = () => {
   const savedTask = localStorage.getItem(STORAGE_KEYS.task);
   const savedContext = localStorage.getItem(STORAGE_KEYS.context);
+  const savedContextUpdatedAt = localStorage.getItem(
+    STORAGE_KEYS.contextUpdatedAt,
+  );
   if (savedTask) {
     elements.task.value = savedTask;
   }
   if (savedContext) {
     elements.context.value = savedContext;
+  }
+  if (savedContext && !savedContextUpdatedAt) {
+    persistInput(STORAGE_KEYS.contextUpdatedAt, Date.now().toString());
   }
 };
 
@@ -366,18 +376,73 @@ const persistInput = (key, value) => {
   }
 };
 
+const formatContextTimestamp = (timestamp) => {
+  if (!timestamp) return "";
+  const date = new Date(Number(timestamp));
+  if (Number.isNaN(date.valueOf())) return "";
+  const datePart = date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+  });
+  const timePart = date.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${datePart}, ${timePart}`;
+};
+
+const updateContextIndicator = () => {
+  if (!elements.contextIndicator) return;
+  const contextValue = elements.context.value.trim();
+  if (!contextValue) {
+    elements.contextIndicator.textContent = "Context: not set";
+    return;
+  }
+  const updatedAt = localStorage.getItem(STORAGE_KEYS.contextUpdatedAt);
+  const formatted = formatContextTimestamp(updatedAt);
+  elements.contextIndicator.textContent = formatted
+    ? `Context: set - updated ${formatted}`
+    : "Context: set";
+};
+
+const setSelectedKey = (key) => {
+  if (!ANALYSIS_KEYS.includes(key)) return;
+  selectedKey = key;
+  if (elements.resultCard) {
+    elements.resultCard.dataset.key = key;
+  }
+  const tabLabel = elements.tabs?.querySelector(`[data-key="${key}"]`)?.textContent;
+  const title = tabLabel || key.charAt(0).toUpperCase() + key.slice(1);
+  if (elements.resultTitle) {
+    elements.resultTitle.textContent = title;
+  }
+  if (elements.resultBody) {
+    elements.resultBody.textContent = currentAnalysis[key] || "No details yet.";
+  }
+  if (elements.tabs) {
+    elements.tabs.querySelectorAll(".tab").forEach((tab) => {
+      tab.classList.toggle("active", tab.dataset.key === key);
+    });
+  }
+};
+
 const init = () => {
   elements.analyze.addEventListener("click", analyzeTask);
 
-  elements.results.addEventListener("click", (event) => {
+  elements.resultCard?.addEventListener("click", (event) => {
     const button = event.target.closest(".card-btn");
     if (!button) return;
-    const card = button.closest(".card");
-    if (!card) return;
-    const key = card.dataset.key;
     const action = button.dataset.action;
-    if (!key || !action) return;
-    handleCardAction(action, key, card);
+    if (!action) return;
+    handleCardAction(action, selectedKey, elements.resultCard);
+  });
+
+  elements.tabs?.addEventListener("click", (event) => {
+    const tab = event.target.closest(".tab");
+    if (!tab) return;
+    const key = tab.dataset.key;
+    if (!key) return;
+    setSelectedKey(key);
   });
 
   elements.task.addEventListener("input", (event) => {
@@ -385,9 +450,17 @@ const init = () => {
   });
   elements.context.addEventListener("input", (event) => {
     persistInput(STORAGE_KEYS.context, event.target.value);
+    persistInput(STORAGE_KEYS.contextUpdatedAt, Date.now().toString());
+    updateContextIndicator();
+  });
+
+  elements.contextIndicator?.addEventListener("click", () => {
+    elements.contextPanel?.classList.toggle("open");
   });
 
   restoreInputs();
+  updateContextIndicator();
+  setSelectedKey(selectedKey);
 };
 
 init();
