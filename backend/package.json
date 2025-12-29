@@ -5,7 +5,8 @@
   "main": "server.js",
   "type": "commonjs",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "analyze:test": "node scripts/analyze-test.js"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
