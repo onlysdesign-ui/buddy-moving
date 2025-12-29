@@ -9,6 +9,11 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
 const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 30000;
+const STRICT_MODE = process.env.STRICT_MODE === "true";
+const OPENAI_TEMPERATURE = Number(process.env.OPENAI_TEMPERATURE ?? 0.45);
+const TOKENS_KEY_COMPLETION = Number(process.env.TOKENS_KEY_COMPLETION ?? 800);
+const TOKENS_DEEPER = Number(process.env.TOKENS_DEEPER ?? 1100);
+const TOKENS_VERIFY = Number(process.env.TOKENS_VERIFY ?? 1100);
 const openaiClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 const {
   configureCaseFileUpdater,
@@ -21,6 +26,11 @@ const port = process.env.PORT || 3000;
 
 console.log("OPENAI_API_KEY:", OPENAI_API_KEY ? "set" : "missing");
 console.log("OPENAI_MODEL:", OPENAI_MODEL);
+console.log("STRICT_MODE:", STRICT_MODE);
+console.log("OPENAI_TEMPERATURE:", OPENAI_TEMPERATURE);
+console.log("TOKENS_KEY_COMPLETION:", TOKENS_KEY_COMPLETION);
+console.log("TOKENS_DEEPER:", TOKENS_DEEPER);
+console.log("TOKENS_VERIFY:", TOKENS_VERIFY);
 
 // ------------------------------
 // CORS (no deps)
@@ -129,7 +139,7 @@ const keyInstructions = {
   hypotheses: [
     "Output format:",
     "### Hypotheses for the primary segment",
-    "- (confidence) If we <do X>, then <Y>, because <Z>. Depends on: <assumption/constraint>",
+    "- (confidence) If we <do X>, then <Y>, because <Z>. Depends on: <assumption/constraint>. How we test: <fast test>",
     "(5-7 items)",
     "",
     "### What these hypotheses optimize for",
@@ -140,11 +150,14 @@ const keyInstructions = {
     "### Key scenarios (primary segment)",
     "1) <scenario name>",
     "- Intent: <1 sentence>",
+    "- Entry point: <where/when/how they start>",
     "- Steps:",
     "  1. ...",
     "  2. ...",
     "  3. ...",
     "- Success criteria:",
+    "  - <2-3 bullets>",
+    "- Drop-off risks:",
     "  - <2-3 bullets>",
     "",
     "(3-5 scenarios)",
@@ -161,16 +174,27 @@ const keyInstructions = {
     "### Should-have success criteria",
     "- SHOULD: <criterion> - Measure later: <how>",
     "(3-5)",
+    "",
+    "### Targets (estimates)",
+    "- <metric range estimate> - Why this range",
+    "",
+    "### Guardrails",
+    "- <risk to avoid> - How we monitor",
   ].join("\n"),
   options: [
     "Output format:",
     "### Option A (recommended direction)",
     "- What it is: <2 sentences>",
+    "- Core mechanic: <mechanism>",
+    "- Where it lives in UI: <surface>",
+    "- Complexity estimate: <S/M/L>",
     "- Why it works for the primary segment:",
     "  - <3-5 bullets>",
     "- Trade-offs:",
     "  - <3 bullets>",
     "- Risks created:",
+    "  - <2-3 bullets>",
+    "- What we will NOT do:",
     "  - <2-3 bullets>",
     "",
     "### Option B (alternative)",
@@ -185,6 +209,11 @@ const keyInstructions = {
     "- Choose: Option <A/B/C>",
     "- Why:",
     "  - <3-6 bullets>",
+    "",
+    "### MVP scope (2 weeks)",
+    "- Build: <what we ship>",
+    "- Do NOT build yet: <what we defer>",
+    "- What the designer designs next: <next design task>",
     "",
     "### Trade-offs we accept",
     "- <3 bullets>",
@@ -249,11 +278,21 @@ function buildKeyPrompt({ key, task, context, language, caseFile }) {
     `Respond only for the "${key}" section.`,
     `Write in ${languageLabel}.`,
     "You must NOT ask the user questions.",
-    "If information is missing, use Assumption (confidence): ... - Impact: ...",
-    "Do NOT invent budgets, timelines, or KPIs. Use qualitative success criteria only.",
+    "Be decision-grade: write like you're accountable for shipping this.",
+    "Never write generic claims without: (mechanism → UI element → expected user behavior).",
+    "You must make trade-offs: pick 1–2 best bets and explicitly say why others are worse.",
+    "You must include constraints, failure modes, and guardrails.",
+    "You MAY propose indicative metric targets as ranges ONLY if clearly labeled as estimates (e.g., +5–15%).",
+    "Do NOT invent budgets or exact timelines.",
+    "If information is missing, use Assumption (confidence): ... - Impact: ... - How to validate: ...",
     "Keep output structured with markdown headings starting with '###'.",
     "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
-    "Keep sections short; avoid long prose.",
+    STRICT_MODE
+      ? "ANTI-FLUFF CHECK: If a sentence could fit any product, rewrite it with specifics."
+      : null,
+    STRICT_MODE
+      ? "Write at least 2 concrete examples in the section (unless the format prevents it)."
+      : null,
     "Be concrete and specific.",
     "Use the Case File to stay consistent. Avoid introducing new entities unless needed.",
     "Use the existing primary_focus and assumptions if present. Do not change them unless framing/audience_focus.",
@@ -441,14 +480,25 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
               {
                 role: "system",
                 content: [
-                  "You are a senior product designer + product strategist.",
+                  "You are Buddy: a senior product designer + product strategist.",
+                  "Your output must be decision-grade and actionable.",
+                  "Avoid generic frameworks and filler text.",
+                  "Always tie claims to: (mechanism → UI element → expected user behavior).",
+                  "Always include trade-offs, failure modes, and guardrails.",
+                  "If info is missing, use Assumption (confidence) + Impact + How to validate (quick).",
                   "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  STRICT_MODE
+                    ? "ANTI-FLUFF: If a sentence could fit any product, rewrite it with specifics (UI, user action, constraint)."
+                    : null,
+                  STRICT_MODE
+                    ? "Be opinionated: pick 1–2 best bets and explicitly reject weaker alternatives."
+                    : null,
                 ].join("\n"),
               },
               { role: "user", content: prompt },
             ],
-            temperature: 0.4,
-            max_tokens: 450,
+            temperature: OPENAI_TEMPERATURE,
+            max_tokens: TOKENS_KEY_COMPLETION,
           },
           { signal }
         );
@@ -491,12 +541,23 @@ async function runDeeper({
     `Write a deeper, more detailed version of the "${key}" card.`,
     `Write in ${languageLabels[language] || "English"}.`,
     "You must NOT ask the user questions.",
-    "Do NOT invent budgets, timelines, or KPIs. Use qualitative success criteria only.",
+    "Be decision-grade: write like you're accountable for shipping this.",
+    "Never write generic claims without: (mechanism → UI element → expected user behavior).",
+    "You must make trade-offs: pick 1–2 best bets and explicitly say why others are worse.",
+    "You must include constraints, failure modes, and guardrails.",
+    "You MAY propose indicative metric targets as ranges ONLY if clearly labeled as estimates (e.g., +5–15%).",
+    "Do NOT invent budgets or exact timelines.",
+    "If information is missing, use Assumption (confidence): ... - Impact: ... - How to validate: ...",
     "Stay consistent with the current analysis for the other keys.",
     "Use the existing primary_focus and assumptions if present. Do not change them unless framing/audience_focus.",
     "Use markdown headings starting with '###'.",
     "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
-    "Keep sections short; avoid long prose.",
+    STRICT_MODE
+      ? "ANTI-FLUFF CHECK: If a sentence could fit any product, rewrite it with specifics."
+      : null,
+    STRICT_MODE
+      ? "Write at least 2 concrete examples in the section (unless the format prevents it)."
+      : null,
     "Be concrete and specific.",
     "",
     "TASK:",
@@ -530,13 +591,28 @@ async function runDeeper({
             messages: [
               {
                 role: "system",
-                content:
+                content: [
+                  "You are Buddy: a senior product designer + product strategist.",
+                  "Your output must be decision-grade and actionable.",
+                  "Avoid generic frameworks and filler text.",
+                  "Always tie claims to: (mechanism → UI element → expected user behavior).",
+                  "Always include trade-offs, failure modes, and guardrails.",
+                  "If info is missing, use Assumption (confidence) + Impact + How to validate (quick).",
                   "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  STRICT_MODE
+                    ? "ANTI-FLUFF: If a sentence could fit any product, rewrite it with specifics (UI, user action, constraint)."
+                    : null,
+                  STRICT_MODE
+                    ? "Be opinionated: pick 1–2 best bets and explicitly reject weaker alternatives."
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
               },
               { role: "user", content: prompt },
             ],
-            temperature: 0.45,
-            max_tokens: 500,
+            temperature: Math.min(OPENAI_TEMPERATURE + 0.05, 0.65),
+            max_tokens: TOKENS_DEEPER,
           },
           { signal }
         ),
@@ -578,11 +654,22 @@ async function runVerify({
     `Write in ${languageLabels[language] || "English"}.`,
     "Re-check realism, remove abstractions, add concrete constraints and assumptions.",
     "You must NOT ask the user questions.",
-    "Do NOT invent budgets, timelines, or KPIs. Use qualitative success criteria only.",
+    "Be decision-grade: write like you're accountable for shipping this.",
+    "Never write generic claims without: (mechanism → UI element → expected user behavior).",
+    "You must make trade-offs: pick 1–2 best bets and explicitly say why others are worse.",
+    "You must include constraints, failure modes, and guardrails.",
+    "You MAY propose indicative metric targets as ranges ONLY if clearly labeled as estimates (e.g., +5–15%).",
+    "Do NOT invent budgets or exact timelines.",
+    "If information is missing, use Assumption (confidence): ... - Impact: ... - How to validate: ...",
     "Use the existing primary_focus and assumptions if present. Do not change them unless framing/audience_focus.",
     "Use markdown headings starting with '###'.",
     "Use '-' for bullets only. Use '1.' '2.' for ordered steps.",
-    "Keep sections short; avoid long prose.",
+    STRICT_MODE
+      ? "ANTI-FLUFF CHECK: If a sentence could fit any product, rewrite it with specifics."
+      : null,
+    STRICT_MODE
+      ? "Write at least 2 concrete examples in the section (unless the format prevents it)."
+      : null,
     "Stay consistent with the other keys.",
     "",
     "TASK:",
@@ -616,13 +703,28 @@ async function runVerify({
             messages: [
               {
                 role: "system",
-                content:
+                content: [
+                  "You are Buddy: a senior product designer + product strategist.",
+                  "Your output must be decision-grade and actionable.",
+                  "Avoid generic frameworks and filler text.",
+                  "Always tie claims to: (mechanism → UI element → expected user behavior).",
+                  "Always include trade-offs, failure modes, and guardrails.",
+                  "If info is missing, use Assumption (confidence) + Impact + How to validate (quick).",
                   "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  STRICT_MODE
+                    ? "ANTI-FLUFF: If a sentence could fit any product, rewrite it with specifics (UI, user action, constraint)."
+                    : null,
+                  STRICT_MODE
+                    ? "Be opinionated: pick 1–2 best bets and explicitly reject weaker alternatives."
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join("\n"),
               },
               { role: "user", content: prompt },
             ],
-            temperature: 0.45,
-            max_tokens: 500,
+            temperature: Math.min(OPENAI_TEMPERATURE + 0.05, 0.65),
+            max_tokens: TOKENS_VERIFY,
           },
           { signal }
         ),
