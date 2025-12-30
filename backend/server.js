@@ -948,7 +948,7 @@ app.post("/analyze", async (req, res) => {
         .json({ error: "AI is not configured (missing env vars)" });
     }
 
-    const language = resolveLanguage(`${task} ${context}`);
+    const language = resolveLanguage(task);
     const analysis = {};
     let caseFile = createEmptyCaseFile();
 
@@ -1008,7 +1008,7 @@ app.post("/analyze/stream", async (req, res) => {
       .json({ error: "AI is not configured (missing env vars)" });
   }
 
-  const language = resolveLanguage(`${task} ${context}`);
+  const language = resolveLanguage(task);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
@@ -1127,7 +1127,7 @@ app.post("/analyze/deeper", async (req, res) => {
         .json({ error: "AI is not configured (missing env vars)" });
     }
 
-    const language = resolveLanguage(`${task} ${context}`);
+    const language = resolveLanguage(task);
     const value = await runDeeper({
       key,
       task,
@@ -1178,7 +1178,7 @@ app.post("/analyze/verify", async (req, res) => {
         .json({ error: "AI is not configured (missing env vars)" });
     }
 
-    const language = resolveLanguage(`${task} ${context}`);
+    const language = resolveLanguage(task);
     const updatedValue = await runVerify({
       key,
       task,

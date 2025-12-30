@@ -90,6 +90,7 @@ npm run start
 **POST `/analyze`**
 - Body: `{ task, context }`
 - Returns: `{ analysis, language }`
+- `language` определяется только по `task`.
 
 **POST `/analyze/stream` (SSE)**
 - Body: `{ task, context }`
@@ -98,11 +99,14 @@ npm run start
   - `event: status` → `{ status, completed, total }`
   - `event: error` → `{ key, error, details }`
   - `event: done` → `{ status: "done" }`
+- `language` в `status` определяется только по `task`.
 
 **POST `/analyze/deeper`**
 - Body: `{ task, context, key, currentAnalysis }`
 - Returns: `{ key, value, language }`
+- `language` определяется только по `task`.
 
 **POST `/analyze/verify`**
 - Body: `{ task, context, key, value, currentAnalysis }`
 - Returns: `{ key, value, language }`
+- `language` определяется только по `task`.
