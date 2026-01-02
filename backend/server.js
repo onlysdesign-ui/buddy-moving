@@ -644,23 +644,46 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
 
 function buildSummaryPrompt({ key, language, fullValue }) {
   const languageLabel = languageLabels[language] || "English";
+  const summaryRequirementsByKey = {
+    framing: [
+      "- Include: problem, desired outcome, biggest drop-off(s), primary leverage point, constraints, and 2–4 assumptions.",
+    ].join("\n"),
+    unknowns: [
+      "- Include: top 3 blocking unknowns with fastest validation methods; 1–2 red flags if present.",
+    ].join("\n"),
+    solution_space: [
+      "- Include 3–5 directions, each with targeted funnel stage and a 1-line why; include top trade-off(s).",
+    ].join("\n"),
+    decision: [
+      "- Include criteria ratings (High/Medium/Low), recommended direction + why, backup + why, and 2–4 first checks.",
+    ].join("\n"),
+    experiment_plan: [
+      "- Include fastest test, A/B test (if applicable), metrics, guardrails, instrumentation/events.",
+    ].join("\n"),
+    work_package: [
+      "- Include flow steps, acceptance criteria highlights, edge cases, analytics events.",
+    ].join("\n"),
+  };
   return [
     "You are a senior product designer + product thinker.",
     `Summarize the "${key}" card into a short, decision-grade digest.`,
     `Write in ${languageLabel}.`,
     "Summary rules (strict):",
-    "- Plain text only. No markdown symbols (#, ###, **). No JSON. No tables.",
-    "- Medium-short summary: ~10–18 bullets total OR 1–2 short paragraphs plus bullets.",
-    "- Must be scannable with 3–6 short chunks (blocks).",
-    "- Each chunk starts with a short label (2–4 words) on its own line, followed by ':'",
-    "- Labels must be chosen dynamically based on content; do not use the same set every time.",
-    "- Avoid repeating the same label across keys unless it naturally fits.",
+    "- Plain text only. No markdown symbols (#, **, *, _, >). No JSON. No tables. No headings.",
+    "- Use 3–6 labeled blocks. Each block starts with a short free label (2–4 words) ending with ':' on its own line.",
+    "- Labels must be unique within the summary; never repeat a label.",
+    "- Do not repeat any bullet idea with different wording.",
     "- Use '-' bullets for lists; keep bullets short (1 line when possible).",
-    "- Allow 1–2 short paragraphs (2–4 lines) if needed, otherwise bullets.",
-    "- Do NOT introduce new metrics, directions, assumptions, or success criteria.",
-    "- Do NOT contradict the full output.",
-    "- Avoid repetition: no duplicated chunks or rephrased points.",
-    "- Language must match the full output (Russian/English).",
+    "- Allow 1–2 short paragraphs if needed, otherwise bullets. Paragraphs must stay within labeled blocks.",
+    "- Target length: ~900–1800 characters OR ~12–22 bullets total.",
+    "- Never invent numbers. If numbers appear, copy them verbatim from the full output.",
+    "- Never introduce new directions, tests, KPIs, stakeholders, or success criteria.",
+    "- Never include content from other keys; summarize only this key.",
+    "- Avoid generic tautologies or filler statements.",
+    "- No standalone questions; unknowns must be statements (no question marks as questions).",
+    "- Use a single language; do not mix languages.",
+    "- Do NOT contradict the full output or add new facts.",
+    summaryRequirementsByKey[key] || "",
     "",
     "FULL OUTPUT TO SUMMARIZE:",
     fullValue,
@@ -686,7 +709,7 @@ async function runSummary({ key, language, fullValue, signal }) {
             { role: "user", content: prompt },
           ],
           temperature: 0.3,
-          max_tokens: 380,
+          max_tokens: 520,
         },
         { signal }
       ),
