@@ -1,21 +1,21 @@
 const API_BASE = "https://buddy-moving.onrender.com";
 const DEFAULT_KEYS = [
   "framing",
-  "audience_focus",
-  "hypotheses",
-  "scenarios",
-  "success_criteria",
-  "options",
-  "recommendation",
+  "unknowns",
+  "solution_space",
+  "decision",
+  "experiment_plan",
+  "work_package",
+  "backlog",
 ];
-const KEY_LABELS = {
-  framing: "Task framing",
-  audience_focus: "Audience focus",
-  hypotheses: "Hypotheses",
-  scenarios: "Scenarios",
-  success_criteria: "Success criteria",
-  options: "Solution options",
-  recommendation: "Recommendation",
+const KEY_TITLES = {
+  framing: "Framing",
+  unknowns: "Unknowns",
+  solution_space: "Solution space",
+  decision: "Decision",
+  experiment_plan: "Experiment plan",
+  work_package: "Work package",
+  backlog: "Backlog",
 };
 const STORAGE_KEYS = {
   task: "buddyMoving.task",
@@ -35,14 +35,8 @@ const elements = {
   resultsList: document.getElementById("results-list"),
 };
 
-let currentAnalysis = DEFAULT_KEYS.reduce((acc, key) => {
-  acc[key] = "";
-  return acc;
-}, {});
-let cardStatuses = DEFAULT_KEYS.reduce((acc, key) => {
-  acc[key] = { status: "idle", error: null };
-  return acc;
-}, {});
+let currentAnalysis = {};
+let cardStatuses = {};
 let activeStreamController = null;
 let activeStreamId = 0;
 let progressState = { completed: 0, total: 0 };
@@ -73,7 +67,16 @@ const setCopyButtonState = (button, isCopied) => {
   button.classList.toggle("copied", isCopied);
 };
 
-const getKeyLabel = (key) => KEY_LABELS[key] || key;
+const getKeyTitle = (key) => KEY_TITLES[key] || key;
+
+const ensureKeyState = (key) => {
+  if (!Object.hasOwn(currentAnalysis, key)) {
+    currentAnalysis[key] = "";
+  }
+  if (!cardStatuses[key]) {
+    cardStatuses[key] = { status: "idle", error: null };
+  }
+};
 
 const createResultCard = (key) => {
   const card = document.createElement("div");
@@ -81,7 +84,7 @@ const createResultCard = (key) => {
   card.dataset.key = key;
   card.innerHTML = `
     <div class="card-head">
-      <h3>${getKeyLabel(key)}</h3>
+      <h3>${getKeyTitle(key)}</h3>
       <div class="card-actions">
         <button class="card-btn" data-action="deeper">Deeper</button>
         <button class="card-btn icon-only" data-action="verify" aria-label="Verify realism" title="Verify realism">
@@ -97,7 +100,7 @@ const createResultCard = (key) => {
       </div>
     </div>
     <div class="card-body">
-      <p class="card-content">No details yet.</p>
+      <div class="card-content">No details yet.</div>
       <div class="card-skeleton" aria-hidden="true">
         <span class="skeleton-line line-xl"></span>
         <span class="skeleton-line line-lg"></span>
@@ -116,24 +119,7 @@ const ensureCard = (key, { moveToEnd = false } = {}) => {
   let card = elements.resultsList.querySelector(`[data-key="${key}"]`);
   if (!card) {
     card = createResultCard(key);
-    if (moveToEnd) {
-      elements.resultsList.appendChild(card);
-    } else {
-      const keyIndex = DEFAULT_KEYS.indexOf(key);
-      const cards = Array.from(
-        elements.resultsList.querySelectorAll("[data-key]"),
-      );
-      const nextCard = cards.find((existing) => {
-        const existingKey = existing.dataset.key;
-        const existingIndex = DEFAULT_KEYS.indexOf(existingKey);
-        return existingIndex > keyIndex;
-      });
-      if (nextCard) {
-        elements.resultsList.insertBefore(card, nextCard);
-      } else {
-        elements.resultsList.appendChild(card);
-      }
-    }
+    elements.resultsList.appendChild(card);
     return card;
   }
   if (moveToEnd) {
@@ -147,13 +133,12 @@ const setCardLoading = (
   isLoading,
   { placeholder = "Loading…", showSkeleton = false, statusText } = {},
 ) => {
-  if (cardStatuses[key]) {
-    if (isLoading) {
-      cardStatuses[key].status = "loading";
-      cardStatuses[key].error = null;
-    } else if (cardStatuses[key].status === "loading") {
-      cardStatuses[key].status = "done";
-    }
+  ensureKeyState(key);
+  if (isLoading) {
+    cardStatuses[key].status = "loading";
+    cardStatuses[key].error = null;
+  } else if (cardStatuses[key].status === "loading") {
+    cardStatuses[key].status = "done";
   }
   const card = ensureCard(key);
   if (!card) return;
@@ -173,14 +158,10 @@ const setCardLoading = (
 };
 
 const updateCard = (key, value) => {
-  if (!Object.hasOwn(currentAnalysis, key)) {
-    currentAnalysis[key] = "";
-  }
+  ensureKeyState(key);
   currentAnalysis[key] = value || "";
-  if (cardStatuses[key]) {
-    cardStatuses[key].status = "done";
-    cardStatuses[key].error = null;
-  }
+  cardStatuses[key].status = "done";
+  cardStatuses[key].error = null;
   const card = ensureCard(key);
   if (!card) return;
   const body = card.querySelector(".card-content");
@@ -195,16 +176,29 @@ const updateCard = (key, value) => {
 };
 
 const setCardError = (key, message, details) => {
-  if (cardStatuses[key]) {
-    cardStatuses[key].status = "error";
-    cardStatuses[key].error = { message, details };
-  }
+  ensureKeyState(key);
+  cardStatuses[key].status = "error";
+  cardStatuses[key].error = { message, details };
   const card = ensureCard(key);
   if (!card) return;
   const body = card.querySelector(".card-content");
-  const detailText = details ? `\n${details}` : "";
   if (body) {
-    body.textContent = `Error: ${message || "Failed"}${detailText}`;
+    body.innerHTML = "";
+    const headline = document.createElement("div");
+    headline.className = "card-error-message";
+    headline.textContent = message || "Failed to generate.";
+    body.appendChild(headline);
+
+    if (details) {
+      const detailsWrapper = document.createElement("details");
+      detailsWrapper.className = "card-error-details";
+      const summary = document.createElement("summary");
+      summary.textContent = "Details";
+      const detailBody = document.createElement("pre");
+      detailBody.textContent = details;
+      detailsWrapper.append(summary, detailBody);
+      body.appendChild(detailsWrapper);
+    }
   }
   card.classList.remove("loading", "skeleton");
   card.classList.add("error");
@@ -218,24 +212,22 @@ const resetCardsForLoading = () => {
   if (elements.resultsList) {
     elements.resultsList.innerHTML = "";
   }
+  currentAnalysis = {};
+  cardStatuses = {};
   DEFAULT_KEYS.forEach((key) => {
-    currentAnalysis[key] = "";
-    if (cardStatuses[key]) {
-      cardStatuses[key].status = "idle";
-      cardStatuses[key].error = null;
-    }
+    ensureKeyState(key);
+    cardStatuses[key].status = "idle";
+    cardStatuses[key].error = null;
   });
   progressState = { completed: 0, total: 0 };
 };
 
 const updateProgress = (completed, total) => {
   if (!elements.statusText) return;
-  if (typeof completed === "number" && typeof total === "number") {
-    if (total > 0) {
-      elements.statusText.textContent = `Analyzing… ${completed}/${total}`;
-    } else {
-      elements.statusText.textContent = "Analyzing…";
-    }
+  if (typeof completed === "number" && typeof total === "number" && total > 0) {
+    elements.statusText.textContent = `Analyzing ${completed}/${total}`;
+  } else {
+    elements.statusText.textContent = "Analyzing…";
   }
 };
 
@@ -409,33 +401,37 @@ const analyzeTask = async () => {
         if (payload.status === "key-start" && payload.key) {
           setCardLoading(payload.key, true, {
             showSkeleton: true,
-            statusText: "Analyzing...",
+            statusText: "Analyzing…",
           });
           return;
         }
 
         if (payload.status === "started") {
-          if (typeof payload.total === "number") {
-            progressState = {
-              completed: typeof payload.completed === "number" ? payload.completed : 0,
-              total: payload.total,
-            };
-            updateProgress(progressState.completed, progressState.total);
-          }
+          const total =
+            typeof payload.total === "number"
+              ? payload.total
+              : DEFAULT_KEYS.length;
+          progressState = {
+            completed:
+              typeof payload.completed === "number" ? payload.completed : 0,
+            total,
+          };
+          updateProgress(progressState.completed, progressState.total);
           return;
         }
 
         if (payload.status === "progress") {
-          if (
-            typeof payload.completed === "number" &&
-            typeof payload.total === "number"
-          ) {
-            progressState = {
-              completed: payload.completed,
-              total: payload.total,
-            };
-            updateProgress(progressState.completed, progressState.total);
-          }
+          progressState = {
+            completed:
+              typeof payload.completed === "number"
+                ? payload.completed
+                : progressState.completed,
+            total:
+              typeof payload.total === "number"
+                ? payload.total
+                : progressState.total || DEFAULT_KEYS.length,
+          };
+          updateProgress(progressState.completed, progressState.total);
         }
       },
       onKey: (payload) => {
@@ -443,7 +439,7 @@ const analyzeTask = async () => {
       },
       onError: (payload) => {
         if (payload?.key) {
-          setCardError(payload.key, payload.error, payload.details);
+          setCardError(payload.key, payload.error || "Failed to generate.", payload.details);
         }
       },
     });
@@ -584,22 +580,14 @@ const updateContextIndicator = () => {
     : "Context set";
 };
 
-const isTextInputTarget = (target) => {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  if (target.tagName === "TEXTAREA") return true;
-  if (target.tagName === "INPUT") {
-    const type = target.type?.toLowerCase() || "text";
-    return ["text", "search", "email", "url", "tel", "password"].includes(type);
-  }
-  return false;
-};
+const isAnalyzeShortcutTarget = (target) =>
+  target === elements.task || target === elements.context;
 
 const init = () => {
   elements.analyze.addEventListener("click", analyzeTask);
 
   document.addEventListener("keydown", (event) => {
-    if (!isTextInputTarget(event.target)) return;
+    if (!isAnalyzeShortcutTarget(event.target)) return;
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
       analyzeTask();

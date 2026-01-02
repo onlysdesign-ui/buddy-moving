@@ -211,12 +211,6 @@ input::placeholder {
   font-weight: 600;
 }
 
-.card p {
-  color: #c7ccd1;
-  line-height: 1.5;
-  white-space: pre-wrap;
-}
-
 .card-body {
   display: flex;
   flex-direction: column;
@@ -226,6 +220,27 @@ input::placeholder {
 
 .card-content {
   flex: 1;
+  color: #c7ccd1;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.card-content details {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #b4bac1;
+}
+
+.card-content summary {
+  cursor: pointer;
+}
+
+.card-content pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+    Menlo, monospace;
+  font-size: 0.78rem;
 }
 
 .card-status {
