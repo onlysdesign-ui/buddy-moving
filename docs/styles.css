@@ -222,7 +222,33 @@ input::placeholder {
   flex: 1;
   color: #c7ccd1;
   line-height: 1.5;
-  white-space: pre-wrap;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-heading {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #f1f3f4;
+}
+
+.card-paragraph {
+  margin: 0;
+  color: inherit;
+}
+
+.card-list {
+  margin: 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+}
+
+.card-spacer {
+  height: 10px;
 }
 
 .card-content details {
