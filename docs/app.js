@@ -6,7 +6,6 @@ const DEFAULT_KEYS = [
   "decision",
   "experiment_plan",
   "work_package",
-  "backlog",
 ];
 const KEY_TITLES = {
   framing: "Framing",
@@ -15,7 +14,6 @@ const KEY_TITLES = {
   decision: "Decision",
   experiment_plan: "Experiment plan",
   work_package: "Work package",
-  backlog: "Backlog",
 };
 const STORAGE_KEYS = {
   task: "buddyMoving.task",
@@ -35,8 +33,10 @@ const elements = {
   resultsList: document.getElementById("results-list"),
 };
 
-let currentAnalysis = {};
+let analysisSummary = {};
+let analysisFull = {};
 let cardStatuses = {};
+let expandedKeys = {};
 let activeStreamController = null;
 let activeStreamId = 0;
 let progressState = { completed: 0, total: 0 };
@@ -70,12 +70,35 @@ const setCopyButtonState = (button, isCopied) => {
 const getKeyTitle = (key) => KEY_TITLES[key] || key;
 
 const ensureKeyState = (key) => {
-  if (!Object.hasOwn(currentAnalysis, key)) {
-    currentAnalysis[key] = "";
+  if (!Object.hasOwn(analysisSummary, key)) {
+    analysisSummary[key] = "";
+  }
+  if (!Object.hasOwn(analysisFull, key)) {
+    analysisFull[key] = "";
   }
   if (!cardStatuses[key]) {
     cardStatuses[key] = { status: "idle", error: null };
   }
+  if (!Object.hasOwn(expandedKeys, key)) {
+    expandedKeys[key] = false;
+  }
+};
+
+const getSummaryValue = (key) => analysisSummary[key] || "";
+const getFullValue = (key) =>
+  analysisFull[key] || analysisSummary[key] || "";
+const isExpanded = (key) => expandedKeys[key] === true;
+
+const getDisplayedValue = (key) =>
+  isExpanded(key) ? getFullValue(key) : getSummaryValue(key);
+
+const setToggleButtonState = (card, key) => {
+  if (!card) return;
+  const button = card.querySelector('[data-action="toggle"]');
+  if (!button) return;
+  const expanded = isExpanded(key);
+  button.textContent = expanded ? "Collapse" : "Expand";
+  button.setAttribute("aria-expanded", expanded ? "true" : "false");
 };
 
 const createResultCard = (key) => {
@@ -86,6 +109,7 @@ const createResultCard = (key) => {
     <div class="card-head">
       <h3>${getKeyTitle(key)}</h3>
       <div class="card-actions">
+        <button class="card-btn" data-action="toggle" aria-expanded="false">Expand</button>
         <button class="card-btn" data-action="deeper">Deeper</button>
         <button class="card-btn icon-only" data-action="verify" aria-label="Verify realism" title="Verify realism">
           <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -148,31 +172,38 @@ const setCardLoading = (
   const body = card.querySelector(".card-content");
   const status = card.querySelector(".card-status");
   if (body) {
-    if (!showSkeleton || !isLoading) {
-      body.textContent = isLoading ? placeholder : body.textContent;
-    }
+    body.textContent = isLoading ? placeholder : body.textContent;
   }
   if (status) {
     status.textContent = isLoading ? statusText || placeholder : "";
   }
 };
 
-const updateCard = (key, value) => {
+const updateCardContent = (key) => {
   ensureKeyState(key);
-  currentAnalysis[key] = value || "";
-  cardStatuses[key].status = "done";
-  cardStatuses[key].error = null;
   const card = ensureCard(key);
   if (!card) return;
   const body = card.querySelector(".card-content");
   if (body) {
-    body.textContent = value || "No details yet.";
+    body.textContent = getDisplayedValue(key) || "No details yet.";
   }
+  setToggleButtonState(card, key);
+};
+
+const updateAnalysisKey = (key, summaryValue, fullValue) => {
+  ensureKeyState(key);
+  analysisSummary[key] = summaryValue || "";
+  analysisFull[key] = fullValue || summaryValue || "";
+  cardStatuses[key].status = "done";
+  cardStatuses[key].error = null;
+  const card = ensureCard(key);
+  if (!card) return;
   card.classList.remove("loading", "skeleton", "error");
   const status = card.querySelector(".card-status");
   if (status) {
     status.textContent = "";
   }
+  updateCardContent(key);
 };
 
 const setCardError = (key, message, details) => {
@@ -212,13 +243,10 @@ const resetCardsForLoading = () => {
   if (elements.resultsList) {
     elements.resultsList.innerHTML = "";
   }
-  currentAnalysis = {};
+  analysisSummary = {};
+  analysisFull = {};
   cardStatuses = {};
-  DEFAULT_KEYS.forEach((key) => {
-    ensureKeyState(key);
-    cardStatuses[key].status = "idle";
-    cardStatuses[key].error = null;
-  });
+  expandedKeys = {};
   progressState = { completed: 0, total: 0 };
 };
 
@@ -229,6 +257,38 @@ const updateProgress = (completed, total) => {
   } else {
     elements.statusText.textContent = "Analyzing…";
   }
+};
+
+const applyAnalysisResponse = (data) => {
+  const summary = data?.analysis && typeof data.analysis === "object"
+    ? data.analysis
+    : {};
+  const full = data?.analysis_full && typeof data.analysis_full === "object"
+    ? data.analysis_full
+    : {};
+
+  const keys = new Set([...Object.keys(summary), ...Object.keys(full)]);
+
+  if (elements.resultsList) {
+    elements.resultsList.innerHTML = "";
+  }
+
+  analysisSummary = {};
+  analysisFull = {};
+  cardStatuses = {};
+  expandedKeys = {};
+
+  keys.forEach((key) => {
+    ensureKeyState(key);
+    const summaryValue = summary[key] || "";
+    const fullValue = full[key] || summaryValue;
+    analysisSummary[key] = summaryValue;
+    analysisFull[key] = fullValue;
+    cardStatuses[key].status = "done";
+    cardStatuses[key].error = null;
+    ensureCard(key);
+    updateCardContent(key);
+  });
 };
 
 const parseSseEvent = (rawEvent) => {
@@ -294,7 +354,9 @@ const streamAnalysis = async ({
           if (onKey) {
             onKey(payload);
           } else {
-            updateCard(payload.key, payload.value);
+            const summaryValue = payload.value ?? payload.full;
+            const fullValue = payload.full ?? payload.value;
+            updateAnalysisKey(payload.key, summaryValue, fullValue);
           }
         }
       } catch (error) {
@@ -371,6 +433,24 @@ const streamAnalysis = async ({
   }
 };
 
+const fetchAnalysis = async ({ task, context, keys, signal }) => {
+  const response = await fetch(`${API_BASE}/analyze`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ task, context, keys }),
+    signal,
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed with ${response.status}`);
+  }
+
+  return response.json();
+};
+
 const analyzeTask = async () => {
   const task = elements.task.value.trim();
   const context = elements.context.value.trim();
@@ -390,6 +470,12 @@ const analyzeTask = async () => {
 
   setStatus(true);
   resetCardsForLoading();
+  DEFAULT_KEYS.forEach((key) => {
+    setCardLoading(key, true, {
+      placeholder: "Analyzing...",
+      statusText: "Analyzing…",
+    });
+  });
 
   try {
     await streamAnalysis({
@@ -400,7 +486,7 @@ const analyzeTask = async () => {
       onStatus: (payload) => {
         if (payload.status === "key-start" && payload.key) {
           setCardLoading(payload.key, true, {
-            showSkeleton: true,
+            placeholder: "Analyzing...",
             statusText: "Analyzing…",
           });
           return;
@@ -435,7 +521,9 @@ const analyzeTask = async () => {
         }
       },
       onKey: (payload) => {
-        updateCard(payload.key, payload.value);
+        const summaryValue = payload.value ?? payload.full;
+        const fullValue = payload.full ?? payload.value;
+        updateAnalysisKey(payload.key, summaryValue, fullValue);
       },
       onError: (payload) => {
         if (payload?.key) {
@@ -447,6 +535,22 @@ const analyzeTask = async () => {
   } catch (error) {
     if (controller.signal.aborted) {
       return;
+    }
+    if (error.message.includes("Streaming is not supported")) {
+      try {
+        const data = await fetchAnalysis({
+          task,
+          context,
+          keys: DEFAULT_KEYS,
+          signal: controller.signal,
+        });
+        applyAnalysisResponse(data);
+        showToast("Analysis complete.");
+        return;
+      } catch (fallbackError) {
+        showToast(`Analysis failed. ${fallbackError.message}`, "error");
+        return;
+      }
     }
     showToast(`Analysis failed. ${error.message}`, "error");
   } finally {
@@ -468,7 +572,7 @@ const handleCardAction = async (action, key, cardElement) => {
 
   if (action === "copy") {
     const value =
-      currentAnalysis[key] ||
+      getDisplayedValue(key) ||
       cardElement.querySelector(".card-content")?.textContent ||
       "";
     try {
@@ -483,6 +587,12 @@ const handleCardAction = async (action, key, cardElement) => {
     } catch (error) {
       showToast("Copy failed. Please try again.", "error");
     }
+    return;
+  }
+
+  if (action === "toggle") {
+    expandedKeys[key] = !expandedKeys[key];
+    updateCardContent(key);
     return;
   }
 
@@ -504,8 +614,8 @@ const handleCardAction = async (action, key, cardElement) => {
         task,
         context,
         key,
-        value: currentAnalysis[key],
-        currentAnalysis,
+        value: getFullValue(key),
+        currentAnalysis: analysisFull,
       }),
     });
 
@@ -518,7 +628,7 @@ const handleCardAction = async (action, key, cardElement) => {
       throw new Error("Unexpected response from API.");
     }
 
-    updateCard(key, data.value);
+    updateAnalysisKey(key, data.value, data.value);
     showToast(action === "deeper" ? "Deeper analysis ready." : "Updated.");
   } catch (error) {
     setCardLoading(key, false);
