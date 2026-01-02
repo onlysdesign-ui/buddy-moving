@@ -15,6 +15,7 @@ const KEY_TITLES = {
   experiment_plan: "Experiment plan",
   work_package: "Work package",
 };
+const KEY_SET = new Set(DEFAULT_KEYS);
 const STORAGE_KEYS = {
   task: "buddyMoving.task",
   context: "buddyMoving.context",
@@ -68,6 +69,16 @@ const setCopyButtonState = (button, isCopied) => {
 };
 
 const getKeyTitle = (key) => KEY_TITLES[key] || key;
+const isSupportedKey = (key) => KEY_SET.has(key);
+
+const normalizeText = (value) => {
+  if (!value) return "";
+  const withoutHeadings = value
+    .split("\n")
+    .map((line) => line.replace(/^#{3,4}\s+/, ""))
+    .join("\n");
+  return withoutHeadings.replace(/\n{3,}/g, "\n\n").trim();
+};
 
 const ensureKeyState = (key) => {
   if (!Object.hasOwn(analysisSummary, key)) {
@@ -157,6 +168,7 @@ const setCardLoading = (
   isLoading,
   { placeholder = "Loading…", showSkeleton = false, statusText } = {},
 ) => {
+  if (!isSupportedKey(key)) return;
   ensureKeyState(key);
   if (isLoading) {
     cardStatuses[key].status = "loading";
@@ -180,17 +192,23 @@ const setCardLoading = (
 };
 
 const updateCardContent = (key) => {
+  if (!isSupportedKey(key)) return;
   ensureKeyState(key);
   const card = ensureCard(key);
   if (!card) return;
   const body = card.querySelector(".card-content");
   if (body) {
-    body.textContent = getDisplayedValue(key) || "No details yet.";
+    const displayed = getDisplayedValue(key);
+    const normalized = normalizeText(displayed);
+    const isLoading = cardStatuses[key]?.status === "loading";
+    body.textContent =
+      normalized || (isLoading ? "Analyzing..." : "No details yet.");
   }
   setToggleButtonState(card, key);
 };
 
 const updateAnalysisKey = (key, summaryValue, fullValue) => {
+  if (!isSupportedKey(key)) return;
   ensureKeyState(key);
   analysisSummary[key] = summaryValue || "";
   analysisFull[key] = fullValue || summaryValue || "";
@@ -207,6 +225,7 @@ const updateAnalysisKey = (key, summaryValue, fullValue) => {
 };
 
 const setCardError = (key, message, details) => {
+  if (!isSupportedKey(key)) return;
   ensureKeyState(key);
   cardStatuses[key].status = "error";
   cardStatuses[key].error = { message, details };
@@ -267,8 +286,6 @@ const applyAnalysisResponse = (data) => {
     ? data.analysis_full
     : {};
 
-  const keys = new Set([...Object.keys(summary), ...Object.keys(full)]);
-
   if (elements.resultsList) {
     elements.resultsList.innerHTML = "";
   }
@@ -278,7 +295,7 @@ const applyAnalysisResponse = (data) => {
   cardStatuses = {};
   expandedKeys = {};
 
-  keys.forEach((key) => {
+  DEFAULT_KEYS.forEach((key) => {
     ensureKeyState(key);
     const summaryValue = summary[key] || "";
     const fullValue = full[key] || summaryValue;
@@ -354,7 +371,7 @@ const streamAnalysis = async ({
           if (onKey) {
             onKey(payload);
           } else {
-            const summaryValue = payload.value ?? payload.full;
+            const summaryValue = payload.value ?? "";
             const fullValue = payload.full ?? payload.value;
             updateAnalysisKey(payload.key, summaryValue, fullValue);
           }
@@ -521,7 +538,7 @@ const analyzeTask = async () => {
         }
       },
       onKey: (payload) => {
-        const summaryValue = payload.value ?? payload.full;
+        const summaryValue = payload.value ?? "";
         const fullValue = payload.full ?? payload.value;
         updateAnalysisKey(payload.key, summaryValue, fullValue);
       },
@@ -628,7 +645,7 @@ const handleCardAction = async (action, key, cardElement) => {
       throw new Error("Unexpected response from API.");
     }
 
-    updateAnalysisKey(key, data.value, data.value);
+    updateAnalysisKey(key, data.value, data.full ?? data.value);
     showToast(action === "deeper" ? "Deeper analysis ready." : "Updated.");
   } catch (error) {
     setCardLoading(key, false);
