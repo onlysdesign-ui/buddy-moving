@@ -14,7 +14,7 @@ const OPENAI_TEMPERATURE = Number(process.env.OPENAI_TEMPERATURE ?? 0.45);
 const TOKENS_DEEPER = Number(process.env.TOKENS_DEEPER ?? 1100);
 const TOKENS_VERIFY = Number(process.env.TOKENS_VERIFY ?? 1100);
 const KEY_COMPLETION_TEMPERATURE = 0.4;
-const KEY_COMPLETION_MAX_TOKENS = 800;
+const KEY_COMPLETION_MAX_TOKENS = 1100;
 const openaiClient = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
 const {
   configureCaseFileUpdater,
@@ -642,48 +642,31 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
   return content.trim();
 }
 
-function buildSummaryPrompt({ key, language, fullValue }) {
+function buildSummaryPrompt({ key, language, fullValue, strictAntiCopy = false }) {
   const languageLabel = languageLabels[language] || "English";
-  const summaryRequirementsByKey = {
-    framing: [
-      "- Include: problem, desired outcome, biggest drop-off(s), primary leverage point, constraints, and 2–4 assumptions.",
-    ].join("\n"),
-    unknowns: [
-      "- Include: top 3 blocking unknowns with fastest validation methods; 1–2 red flags if present.",
-    ].join("\n"),
-    solution_space: [
-      "- Include 3–5 directions, each with targeted funnel stage and a 1-line why; include top trade-off(s).",
-    ].join("\n"),
-    decision: [
-      "- Include criteria ratings (High/Medium/Low), recommended direction + why, backup + why, and 2–4 first checks.",
-    ].join("\n"),
-    experiment_plan: [
-      "- Include fastest test, A/B test (if applicable), metrics, guardrails, instrumentation/events.",
-    ].join("\n"),
-    work_package: [
-      "- Include flow steps, acceptance criteria highlights, edge cases, analytics events.",
-    ].join("\n"),
-  };
   return [
     "You are a senior product designer + product thinker.",
-    `Summarize the "${key}" card into a short, decision-grade digest.`,
+    `Summarize the "${key}" card into a dense, decision-grade digest.`,
     `Write in ${languageLabel}.`,
     "Summary rules (strict):",
-    "- Plain text only. No markdown symbols (#, **, *, _, >). No JSON. No tables. No headings.",
-    "- Use 3–6 labeled blocks. Each block starts with a short free label (2–4 words) ending with ':' on its own line.",
-    "- Labels must be unique within the summary; never repeat a label.",
-    "- Do not repeat any bullet idea with different wording.",
-    "- Use '-' bullets for lists; keep bullets short (1 line when possible).",
-    "- Allow 1–2 short paragraphs if needed, otherwise bullets. Paragraphs must stay within labeled blocks.",
-    "- Target length: ~900–1800 characters OR ~12–22 bullets total.",
+    "- Plain text only. No markdown symbols (#, **, *, _, >). No JSON. No tables.",
+    "- Produce a digest, not a reformat of the full output.",
+    "- 12–25 lines total. Use 3–6 semantic blocks.",
+    "- Each block starts with a short, unique label (1–4 words) ending with ':' on its own line.",
+    "- Labels must be diverse and chosen based on content. Do not reuse the same label.",
+    "- Inside a block use short sentences or compact bullets; avoid long multi-line items.",
+    "- Do not mirror the structure of the full output or reuse its headings.",
+    "- Include: what matters, why it matters, and what to do next.",
+    "- Use concrete details from the full output (numbers, funnel stages, specific unknowns, decision, tests).",
+    "- No new metrics, directions, tests, KPIs, stakeholders, or goals.",
+    "- No filler like 'analyze data' or 'find reasons'—replace with specific actions already in the full output.",
     "- Never invent numbers. If numbers appear, copy them verbatim from the full output.",
-    "- Never introduce new directions, tests, KPIs, stakeholders, or success criteria.",
-    "- Never include content from other keys; summarize only this key.",
-    "- Avoid generic tautologies or filler statements.",
-    "- No standalone questions; unknowns must be statements (no question marks as questions).",
-    "- Use a single language; do not mix languages.",
+    "- No standalone questions; unknowns must be statements.",
+    "- Do not repeat a block. Do not start over. Only one digest.",
     "- Do NOT contradict the full output or add new facts.",
-    summaryRequirementsByKey[key] || "",
+    strictAntiCopy
+      ? "- STRICT ANTI-COPY MODE: Do not reuse sentences, bullets, or structure from the full output. Paraphrase and compress."
+      : "",
     "",
     "FULL OUTPUT TO SUMMARIZE:",
     fullValue,
@@ -692,8 +675,8 @@ function buildSummaryPrompt({ key, language, fullValue }) {
   ].join("\n");
 }
 
-async function runSummary({ key, language, fullValue, signal }) {
-  const prompt = buildSummaryPrompt({ key, language, fullValue });
+async function runSummary({ key, language, fullValue, signal, strictAntiCopy }) {
+  const prompt = buildSummaryPrompt({ key, language, fullValue, strictAntiCopy });
   const result = await runWithTimeout(
     `OpenAI summary ${key} request`,
     OPENAI_TIMEOUT_MS,
@@ -724,6 +707,46 @@ async function runSummary({ key, language, fullValue, signal }) {
     throw new Error("OpenAI summary response was empty");
   }
   return content.trim();
+}
+
+function isSummaryTooSimilar(summary, fullValue) {
+  if (!summary || !fullValue) return false;
+  if (summary.includes("###") || summary.includes("####")) return true;
+  const summaryLines = summary
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const fullLines = new Set(
+    fullValue
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+  );
+  if (summaryLines.length === 0) return false;
+  const matched = summaryLines.filter((line) => fullLines.has(line)).length;
+  return matched / summaryLines.length > 0.4;
+}
+
+async function generateSummaryWithRetry({ key, language, fullValue, signal }) {
+  let summary = await runSummary({ key, language, fullValue, signal });
+  if (!isSummaryTooSimilar(summary, fullValue)) {
+    return summary;
+  }
+  try {
+    const retrySummary = await runSummary({
+      key,
+      language,
+      fullValue,
+      signal,
+      strictAntiCopy: true,
+    });
+    if (retrySummary) {
+      summary = retrySummary;
+    }
+  } catch (error) {
+    console.warn(`[summary] retry failed for key=${key}:`, error);
+  }
+  return summary;
 }
 
 async function runDeeper({
@@ -964,7 +987,7 @@ app.post("/analyze", async (req, res) => {
       caseFile = updatedCaseFile;
       let summary = "";
       try {
-        summary = await runSummary({
+        summary = await generateSummaryWithRetry({
           key,
           language,
           fullValue: full,
@@ -1065,7 +1088,7 @@ app.post("/analyze/stream", async (req, res) => {
 
         let summary = "";
         try {
-          summary = await runSummary({
+          summary = await generateSummaryWithRetry({
             key,
             language,
             fullValue: value,
@@ -1154,7 +1177,7 @@ app.post("/analyze/deeper", async (req, res) => {
     });
     let summary = "";
     try {
-      summary = await runSummary({
+      summary = await generateSummaryWithRetry({
         key,
         language,
         fullValue: value,
@@ -1221,7 +1244,7 @@ app.post("/analyze/verify", async (req, res) => {
     });
     let summary = "";
     try {
-      summary = await runSummary({
+      summary = await generateSummaryWithRetry({
         key,
         language,
         fullValue: updatedValue,
