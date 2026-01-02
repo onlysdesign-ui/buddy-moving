@@ -96,7 +96,6 @@ const analysisKeys = [
   "decision",
   "experiment_plan",
   "work_package",
-  "backlog",
 ];
 
 const keyInstructions = {
@@ -149,6 +148,8 @@ const keyInstructions = {
     "- Do not invent constraints.",
     "- Funnel diagnosis must reference provided numbers if present.",
     "- Assumptions must be 3–6, not more.",
+    "- Max ~20 bullets total across sections.",
+    "- No bullet should run longer than 3 lines.",
   ].join("\n"),
 
   unknowns: [
@@ -187,6 +188,8 @@ const keyInstructions = {
   "- Every unknown must include fastest way to validate.",
   "- Prefer validation via existing analytics/logs/recordings before interviews.",
   "- Do not address the user directly.",
+  "- Max 10 unknowns total across sections.",
+  "- No bullet should run longer than 3 lines.",
 ].join("\n"),
 
   solution_space: [
@@ -217,8 +220,9 @@ const keyInstructions = {
   "Quality rules:",
   "- Directions must be materially different.",
   "- Each direction must cite at least one unknown/assumption it resolves.",
-  "- Max 7 directions.",
+  "- Max 5 directions.",
   "- Do NOT propose 'free full access' if constraints forbid it.",
+  "- No bullet should run longer than 3 lines.",
 ].join("\n"),
 
   decision: [
@@ -229,11 +233,11 @@ const keyInstructions = {
   "Input dependencies:",
   "- Uses solution_space + unknowns + framing from Case File.",
   "Output format (strict):",
-  "### Decision criteria",
-  "- Speed to validate",
-  "- Expected impact on the primary leverage point",
-  "- Risk reduction",
-  "- Complexity / cost",
+  "Decision criteria:",
+  "- Speed to validate = <High/Medium/Low>",
+  "- Expected impact on the primary leverage point = <High/Medium/Low>",
+  "- Risk reduction = <High/Medium/Low>",
+  "- Complexity / cost = <High/Medium/Low>",
   "",
   "### Recommended direction",
   "- Pick: <A/B/C/...>",
@@ -255,6 +259,8 @@ const keyInstructions = {
   "- One primary + one backup only.",
   "- First checks must reduce unknowns, not 'just ship and see'.",
   "- If task text contains a proposed solution, explicitly say why it's NOT chosen or what would make you choose it.",
+  "- Max 8 bullets total across sections.",
+  "- No bullet should run longer than 3 lines.",
 ].join("\n"),
   experiment_plan: [
   "Card: Experiment plan",
@@ -298,6 +304,8 @@ const keyInstructions = {
   "- Do not invent targets, thresholds, sample sizes, or timelines.",
   "- If user provided targets (e.g., +20%), you may reference them.",
   "- Each test must tie back to unknowns AND the primary leverage point.",
+  "- Max 12 bullets total across sections.",
+  "- No bullet should run longer than 3 lines.",
 ].join("\n"),
 
   work_package: [
@@ -339,34 +347,8 @@ const keyInstructions = {
     "- Prototype outline must stay focused.",
     "Assumptions policy:",
     "- If you introduce new entities, mark them as assumptions.",
-  ].join("\n"),
-  backlog: [
-    "Card: Backlog",
-    "Purpose:",
-    "- Convert outputs into tracker-ready tasks with clear DoD.",
-    "Input dependencies:",
-    "- Uses work_package + experiment_plan + decision from Case File.",
-    "Output format (strict):",
-    "### Research tasks",
-    "- <title>",
-    "  - Definition of done:",
-    "    - ...",
-    "",
-    "### Design tasks",
-    "- ...",
-    "",
-    "### Analytics tasks",
-    "- ...",
-    "",
-    "### Dev tasks",
-    "- ...",
-    "",
-    "Quality rules:",
-    "- 2–5 tasks per category max.",
-    "- Definition of done must reference earlier artifacts.",
-    "- Avoid vague tasks.",
-    "Assumptions policy:",
-    "- If tasks rely on missing info, mark as Assumption.",
+    "- Max 12 bullets total across sections.",
+    "- No bullet should run longer than 3 lines.",
   ].join("\n"),
 };
 
@@ -414,6 +396,7 @@ function buildKeyPrompt({ key, task, context, language, caseFile }) {
     "Do not use direct questions addressed to the user (no 'you'). Write unknowns as statements: 'Unknown: ...'.",
     "Do not invent deadlines, budgets, or KPIs. If missing, use 'Not specified' or 'Assumption: ... (confidence: low)'.",
     "Avoid fluff. Every bullet must be checkable or directly useful for execution.",
+    "Keep sections short with scannable bullets. Avoid deep nesting.",
     "All artifacts must be copy-pastable into a ticket.",
     "Every output must include at least one explicit assumption (more if data is missing).",
     "Do not introduce new stakeholders/entities unless necessary; if you do, mark as Assumption.",
@@ -459,8 +442,14 @@ function buildContextSummary(currentAnalysis, keyToSkip) {
     .filter((key) => key !== keyToSkip)
     .map((key) => {
       const value = currentAnalysis[key];
-      if (!value || typeof value !== "string") return null;
-      return `${key}: ${value}`;
+      if (!value) return null;
+      if (typeof value === "string") {
+        return `${key}: ${value}`;
+      }
+      if (typeof value === "object" && typeof value.full === "string") {
+        return `${key}: ${value.full}`;
+      }
+      return null;
     })
     .filter(Boolean);
 
@@ -648,6 +637,100 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
   return content.trim();
 }
 
+async function runKeySummary({
+  key,
+  full,
+  task,
+  context,
+  language,
+  caseFile,
+  signal,
+}) {
+  const languageLabel = languageLabels[language] || "English";
+  const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
+  const promptBase = [
+    "You are a senior product designer + product thinker.",
+    `Summarize the "${key}" card into a short, decision-grade digest.`,
+    `Write in ${languageLabel}.`,
+    "Summary rules (strict):",
+    "- Max 1200 characters (hard limit).",
+    "- Plain text only. No markdown. No tables.",
+    "- Use only these headings: PROBLEM, UNKNOWN, DIRECTION, NEXT.",
+    "- Use '-' bullets only. 5–10 bullets total.",
+    "- Must include: What we know, Top unknowns, Recommended direction (if available), Next actions (24–72h) if relevant.",
+    "- Do not invent new info. Do not contradict the full output.",
+    "- Keep bullets short and scannable.",
+    "",
+    "TASK:",
+    task,
+    "",
+    "CONTEXT:",
+    context || "(none)",
+    "",
+    "CASE FILE (JSON):",
+    serializedCaseFile || "(none)",
+    "",
+    "FULL OUTPUT TO SUMMARIZE:",
+    full,
+  ].join("\n");
+
+  const runOnce = async (prefix, prompt) => {
+    const result = await runWithTimeout(
+      prefix,
+      OPENAI_TIMEOUT_MS,
+      (signal) =>
+        openaiClient.chat.completions.create(
+          {
+            model: OPENAI_MODEL,
+            messages: [
+              {
+                role: "system",
+                content:
+                  "Return a short, bullet-driven summary with strict headings.",
+              },
+              { role: "user", content: prompt },
+            ],
+            temperature: Math.max(KEY_COMPLETION_TEMPERATURE - 0.1, 0.2),
+            max_tokens: 450,
+          },
+          { signal }
+        ),
+      { signal }
+    );
+    if (!result.ok) {
+      throw result.error;
+    }
+    return result.value;
+  };
+
+  let response = await runOnce(`OpenAI summary ${key} request`, promptBase);
+  let content = response?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string") {
+    throw new Error("OpenAI summary response was empty");
+  }
+  content = content.trim();
+
+  if (content.length > 1200) {
+    response = await runOnce(
+      `OpenAI summary ${key} retry`,
+      [
+        "Your previous summary was too long.",
+        "Rewrite it to be <= 1200 characters.",
+        "Keep the same strict format and required headings.",
+        "",
+        promptBase,
+      ].join("\n")
+    );
+    content = response?.choices?.[0]?.message?.content;
+    if (!content || typeof content !== "string") {
+      throw new Error("OpenAI summary response was empty");
+    }
+    content = content.trim();
+  }
+
+  return content;
+}
+
 async function runDeeper({
   key,
   task,
@@ -668,6 +751,7 @@ async function runDeeper({
     "Do not ask the user questions. Use only: 'We need to confirm:', 'Unknown:', or 'Assumption:' if needed.",
     "Do not invent deadlines, budgets, or KPIs. If missing, use 'Not specified' or 'Assumption: ... (confidence: low)'.",
     "Avoid fluff. Every bullet must be checkable or directly useful for execution.",
+    "Keep sections short with scannable bullets (no bullet longer than 3 lines). Avoid deep nesting.",
     "Every output must include at least one explicit assumption.",
     "Do not introduce new stakeholders/entities unless necessary; if you do, mark as Assumption.",
     "Stay consistent with the current analysis for the other keys.",
@@ -756,6 +840,7 @@ async function runVerify({
     "Do not ask the user questions. Use only: 'We need to confirm:', 'Unknown:', or 'Assumption:' if needed.",
     "Do not invent deadlines, budgets, or KPIs. If missing, use 'Not specified' or 'Assumption: ... (confidence: low)'.",
     "Avoid fluff. Every bullet must be checkable or directly useful for execution.",
+    "Keep sections short with scannable bullets (no bullet longer than 3 lines). Avoid deep nesting.",
     "Every output must include at least one explicit assumption.",
     "Do not introduce new stakeholders/entities unless necessary; if you do, mark as Assumption.",
     "Stay consistent with the other keys.",
@@ -862,7 +947,7 @@ app.post("/analyze", async (req, res) => {
     let caseFile = createEmptyCaseFile();
 
     for (const key of analysisKeys) {
-      const value = await runKeyCompletion({
+      const full = await runKeyCompletion({
         key,
         task,
         context,
@@ -873,7 +958,7 @@ app.post("/analyze", async (req, res) => {
       try {
         updatedCaseFile = await updateCaseFile(
           key,
-          value,
+          full,
           caseFile,
           task,
           context
@@ -882,7 +967,18 @@ app.post("/analyze", async (req, res) => {
         console.warn(`[casefile] update failed after ${key}:`, updateError);
       }
       caseFile = updatedCaseFile;
-      analysis[key] = appendDebugLine(value, caseFile);
+      const summary = await runKeySummary({
+        key,
+        full,
+        task,
+        context,
+        language,
+        caseFile,
+      });
+      analysis[key] = {
+        summary,
+        full: appendDebugLine(full, caseFile),
+      };
     }
 
     return res.json({ analysis, language });
@@ -959,7 +1055,6 @@ app.post("/analyze/stream", async (req, res) => {
           language,
           caseFile,
         });
-
         try {
           caseFile = await updateCaseFile(key, value, caseFile, task, context);
           if (process.env.NODE_ENV !== "production") {
@@ -971,8 +1066,21 @@ app.post("/analyze/stream", async (req, res) => {
           console.warn(`[casefile] update failed after ${key}:`, updateError);
         }
 
+        const summary = await runKeySummary({
+          key,
+          full: value,
+          task,
+          context,
+          language,
+          caseFile,
+        });
         const valueWithDebug = appendDebugLine(value, caseFile);
-        writeSseEvent(res, "key", { key, value: valueWithDebug, status: "ok" });
+        writeSseEvent(res, "key", {
+          key,
+          summary,
+          full: valueWithDebug,
+          status: "ok",
+        });
         console.log(`[stream] done key=${key} ok`);
       } catch (error) {
         if (clientGone) {
@@ -1045,8 +1153,21 @@ app.post("/analyze/deeper", async (req, res) => {
       currentAnalysis,
       caseFile,
     });
+    const summary = await runKeySummary({
+      key,
+      full: value,
+      task,
+      context,
+      language,
+      caseFile,
+    });
 
-    return res.json({ key, value: appendDebugLine(value, caseFile), language });
+    return res.json({
+      key,
+      summary,
+      full: appendDebugLine(value, caseFile),
+      language,
+    });
   } catch (err) {
     console.error("OpenAI request failed:", err);
     return res.status(500).json({
@@ -1097,10 +1218,19 @@ app.post("/analyze/verify", async (req, res) => {
       value,
       caseFile,
     });
+    const summary = await runKeySummary({
+      key,
+      full: updatedValue,
+      task,
+      context,
+      language,
+      caseFile,
+    });
 
     return res.json({
       key,
-      value: appendDebugLine(updatedValue, caseFile),
+      summary,
+      full: appendDebugLine(updatedValue, caseFile),
       language,
     });
   } catch (err) {

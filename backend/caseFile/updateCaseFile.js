@@ -48,12 +48,6 @@ const DEFAULT_CASE_FILE = {
       components: [],
     },
   },
-  backlog: {
-    research_tasks: [],
-    design_tasks: [],
-    analytics_tasks: [],
-    dev_tasks: [],
-  },
 };
 
 let openaiClient = null;
@@ -259,37 +253,6 @@ function mergeCaseFile(currentCaseFile, patch) {
     }
   }
 
-  if (patch.backlog) {
-    const baseBacklog = base.backlog || {};
-    const incoming = patch.backlog || {};
-    nextCaseFile.backlog = {
-      research_tasks: mergeArrayByKey(
-        baseBacklog.research_tasks,
-        incoming.research_tasks,
-        "title",
-        { definition_of_done: "string" }
-      ),
-      design_tasks: mergeArrayByKey(
-        baseBacklog.design_tasks,
-        incoming.design_tasks,
-        "title",
-        { definition_of_done: "string" }
-      ),
-      analytics_tasks: mergeArrayByKey(
-        baseBacklog.analytics_tasks,
-        incoming.analytics_tasks,
-        "title",
-        { definition_of_done: "string" }
-      ),
-      dev_tasks: mergeArrayByKey(
-        baseBacklog.dev_tasks,
-        incoming.dev_tasks,
-        "title",
-        { definition_of_done: "string" }
-      ),
-    };
-  }
-
   return nextCaseFile;
 }
 
@@ -307,7 +270,7 @@ async function updateCaseFile(cardType, cardText, caseFile, task, context) {
     "- Omit empty fields; do not include nulls or empty arrays.",
     "- Avoid duplicates; reuse existing entities where possible.",
     "- Dedupe strings case-insensitively.",
-    "- Dedupe directions by id; metrics by name; tasks by title.",
+    "- Dedupe directions by id; metrics by name.",
     "- Keep output short (<= 500 tokens).",
     "",
     "caseFile schema:",
