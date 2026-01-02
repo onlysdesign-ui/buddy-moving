@@ -62,29 +62,6 @@ describe("mergeCaseFile", () => {
     expect(updated.what_to_test_first).toEqual(["Adoption"]);
   });
 
-  it("dedupes tasks by title", () => {
-    const base = createEmptyCaseFile();
-    base.backlog.dev_tasks = [
-      { title: "Implement API", definition_of_done: ["Routes respond"] },
-    ];
-
-    const patch = {
-      backlog: {
-        dev_tasks: [
-          { title: "implement api", definition_of_done: ["Unit tests added"] },
-        ],
-      },
-    };
-
-    const merged = mergeCaseFile(base, patch);
-
-    expect(merged.backlog.dev_tasks).toHaveLength(1);
-    expect(merged.backlog.dev_tasks[0].definition_of_done).toEqual([
-      "Routes respond",
-      "Unit tests added",
-    ]);
-  });
-
   it("preserves recommended_direction_id when patch is empty", () => {
     const base = createEmptyCaseFile();
     base.decision.recommended_direction_id = "B";

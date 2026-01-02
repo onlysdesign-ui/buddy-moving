@@ -36,13 +36,12 @@ Expected response shape:
 ```json
 {
   "analysis": {
-    "framing": "...",
-    "unknowns": "...",
-    "solution_space": "...",
-    "decision": "...",
-    "experiment_plan": "...",
-    "work_package": "...",
-    "backlog": "..."
+    "framing": { "summary": "...", "full": "..." },
+    "unknowns": { "summary": "...", "full": "..." },
+    "solution_space": { "summary": "...", "full": "..." },
+    "decision": { "summary": "...", "full": "..." },
+    "experiment_plan": { "summary": "...", "full": "..." },
+    "work_package": { "summary": "...", "full": "..." }
   }
 }
 ```
@@ -51,7 +50,7 @@ Expected response shape:
 
 ```bash
 curl -N -H "Content-Type: application/json" \
-  -d '{"task":"Design a moving assistant for renters","context":"Focus on students moving between dorms","keys":["framing","unknowns","solution_space","decision","experiment_plan","work_package","backlog"]}' \
+  -d '{"task":"Design a moving assistant for renters","context":"Focus on students moving between dorms","keys":["framing","unknowns","solution_space","decision","experiment_plan","work_package"]}' \
   http://localhost:3000/analyze/stream
 ```
 
@@ -65,6 +64,6 @@ curl -X POST https://buddy-moving.onrender.com/analyze \
 
 ```bash
 curl -N -H "Content-Type: application/json" \
-  -d '{"task":"Improve move planning for renters","context":"Focus on short-notice moves","keys":["framing","unknowns","solution_space","decision","experiment_plan","work_package","backlog"]}' \
+  -d '{"task":"Improve move planning for renters","context":"Focus on short-notice moves","keys":["framing","unknowns","solution_space","decision","experiment_plan","work_package"]}' \
   https://buddy-moving.onrender.com/analyze/stream
 ```
