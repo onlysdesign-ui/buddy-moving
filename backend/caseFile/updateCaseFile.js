@@ -3,43 +3,56 @@ const DEFAULT_CASE_FILE = {
     problem: "",
     outcome: "",
     non_goals: [],
+    constraints: {
+      business: [],
+      product: [],
+      tech: [],
+      compliance: [],
+    },
   },
   assumptions: [],
-  primary_focus: {
-    segment: "",
+  unknowns: {
+    blocking: [],
+    high_impact: [],
+    cheap_to_answer: [],
+    expensive_to_answer: [],
+    red_flags: [],
+  },
+  solution_space: {
+    directions: [],
+  },
+  decision: {
+    criteria: [],
+    recommended_direction_id: "",
+    backup_direction_id: "",
     reasoning: [],
-    confidence: "",
+    first_checks: [],
   },
-  segments: {
-    primary: {
-      who: "",
-      goals: [],
-      pains: [],
-      triggers: [],
+  experiment_plan: {
+    fastest_test: [],
+    prototype_test: [],
+    ab_test: [],
+    metrics: [],
+    instrumentation: [],
+    stop_criteria: [],
+  },
+  work_package: {
+    user_flow: [],
+    acceptance_criteria: [],
+    edge_cases: [],
+    copy_notes: [],
+    analytics_events: [],
+    prototype_outline: {
+      screens: [],
+      states: [],
+      components: [],
     },
-    secondary: [],
   },
-  hypotheses: [],
-  scenarios: [],
-  success_criteria: [],
-  solution_options: {
-    option_a: {
-      name: "",
-      description: "",
-      why: [],
-      tradeoffs: [],
-      risks: [],
-    },
-    option_b: null,
-    option_c: null,
-  },
-  recommendation: {
-    chosen_option: "",
-    why: [],
-    tradeoffs: [],
-    first_week_plan: [],
-    first_validation_steps: [],
-    if_assumptions_wrong: [],
+  backlog: {
+    research_tasks: [],
+    design_tasks: [],
+    analytics_tasks: [],
+    dev_tasks: [],
   },
 };
 
@@ -65,6 +78,10 @@ function normalizeString(value) {
   return value.trim();
 }
 
+function normalizeKey(value) {
+  return normalizeString(value).toLowerCase();
+}
+
 function isNonEmptyString(value) {
   return normalizeString(value).length > 0;
 }
@@ -79,11 +96,12 @@ function mergeStringArray(targetArray, incomingArray) {
     return targetArray;
   }
   const result = Array.isArray(targetArray) ? [...targetArray] : [];
-  const seen = new Set(result.map((item) => normalizeString(item)).filter(Boolean));
+  const seen = new Set(result.map((item) => normalizeKey(item)).filter(Boolean));
   for (const item of incomingArray) {
     const normalized = normalizeString(item);
-    if (!normalized || seen.has(normalized)) continue;
-    seen.add(normalized);
+    const normalizedKey = normalizeKey(item);
+    if (!normalized || seen.has(normalizedKey)) continue;
+    seen.add(normalizedKey);
     result.push(normalized);
   }
   return result;
@@ -124,13 +142,13 @@ function mergeArrayByKey(targetArray, incomingArray, keyField, mergeKeys = {}) {
   const result = Array.isArray(targetArray) ? [...targetArray] : [];
   const indexByKey = new Map();
   for (let i = 0; i < result.length; i += 1) {
-    const keyValue = normalizeString(result[i]?.[keyField]);
+    const keyValue = normalizeKey(result[i]?.[keyField]);
     if (keyValue) indexByKey.set(keyValue, i);
   }
 
   for (const item of incomingArray) {
     if (!item || typeof item !== "object") continue;
-    const keyValue = normalizeString(item[keyField]);
+    const keyValue = normalizeKey(item[keyField]);
     if (!keyValue) continue;
 
     if (indexByKey.has(keyValue)) {
@@ -144,38 +162,6 @@ function mergeArrayByKey(targetArray, incomingArray, keyField, mergeKeys = {}) {
   }
 
   return result;
-}
-
-function mergeSolutionOption(target, incoming) {
-  if (!incoming || typeof incoming !== "object") return target;
-  return mergeObjectFields(target, incoming, {
-    mergeKeys: {
-      why: "string",
-      tradeoffs: "string",
-      risks: "string",
-    },
-  });
-}
-
-function mergeSolutionOptions(target, incoming) {
-  if (!incoming || typeof incoming !== "object") return target;
-  const output = { ...(target || {}) };
-
-  if (incoming.option_a && typeof incoming.option_a === "object") {
-    output.option_a = mergeSolutionOption(output.option_a, incoming.option_a);
-  }
-
-  if (incoming.option_b && typeof incoming.option_b === "object") {
-    if (!output.option_b) output.option_b = {};
-    output.option_b = mergeSolutionOption(output.option_b, incoming.option_b);
-  }
-
-  if (incoming.option_c && typeof incoming.option_c === "object") {
-    if (!output.option_c) output.option_c = {};
-    output.option_c = mergeSolutionOption(output.option_c, incoming.option_c);
-  }
-
-  return output;
 }
 
 function mergeCaseFile(currentCaseFile, patch) {
@@ -193,84 +179,115 @@ function mergeCaseFile(currentCaseFile, patch) {
   }
 
   if (Array.isArray(patch.assumptions)) {
-    nextCaseFile.assumptions = mergeArrayByKey(
+    nextCaseFile.assumptions = mergeStringArray(
       base.assumptions,
-      patch.assumptions,
-      "text"
+      patch.assumptions
     );
   }
 
-  if (patch.primary_focus) {
-    nextCaseFile.primary_focus = mergeObjectFields(
-      base.primary_focus,
-      patch.primary_focus,
-      { mergeKeys: { reasoning: "string" } }
-    );
+  if (patch.unknowns) {
+    nextCaseFile.unknowns = mergeObjectFields(base.unknowns, patch.unknowns);
   }
 
-  if (patch.segments) {
-    const baseSegments = base.segments || {};
-    const incoming = patch.segments || {};
-    nextCaseFile.segments = {
-      primary: mergeObjectFields(baseSegments.primary, incoming.primary, {
-        mergeKeys: { goals: "string", pains: "string", triggers: "string" },
-      }),
-      secondary: mergeArrayByKey(
-        baseSegments.secondary,
-        incoming.secondary,
-        "who",
-        { goals: "string", pains: "string" }
+  if (patch.solution_space?.directions) {
+    nextCaseFile.solution_space = {
+      ...base.solution_space,
+      directions: mergeArrayByKey(
+        base.solution_space?.directions,
+        patch.solution_space.directions,
+        "id",
+        {
+          why: "string",
+          must_be_true: "string",
+          trade_offs: "string",
+          what_to_test_first: "string",
+        }
       ),
     };
   }
 
-  if (Array.isArray(patch.hypotheses)) {
-    nextCaseFile.hypotheses = mergeArrayByKey(
-      base.hypotheses,
-      patch.hypotheses,
-      "statement",
-      { depends_on: "string" }
-    );
+  if (patch.decision) {
+    nextCaseFile.decision = mergeObjectFields(base.decision, patch.decision, {
+      mergeKeys: {
+        criteria: "string",
+        reasoning: "string",
+        first_checks: "string",
+      },
+    });
   }
 
-  if (Array.isArray(patch.scenarios)) {
-    nextCaseFile.scenarios = mergeArrayByKey(
-      base.scenarios,
-      patch.scenarios,
-      "name",
-      { steps: "string", success_criteria: "string" }
-    );
+  if (patch.experiment_plan) {
+    const basePlan = base.experiment_plan || {};
+    const incoming = patch.experiment_plan || {};
+    nextCaseFile.experiment_plan = mergeObjectFields(basePlan, incoming, {
+      mergeKeys: {
+        fastest_test: "string",
+        prototype_test: "string",
+        ab_test: "string",
+        instrumentation: "string",
+        stop_criteria: "string",
+      },
+    });
+    if (Array.isArray(incoming.metrics)) {
+      nextCaseFile.experiment_plan.metrics = mergeArrayByKey(
+        basePlan.metrics,
+        incoming.metrics,
+        "name",
+        { notes: "string" }
+      );
+    }
   }
 
-  if (Array.isArray(patch.success_criteria)) {
-    nextCaseFile.success_criteria = mergeArrayByKey(
-      base.success_criteria,
-      patch.success_criteria,
-      "criterion"
-    );
+  if (patch.work_package) {
+    const basePackage = base.work_package || {};
+    const incoming = patch.work_package || {};
+    nextCaseFile.work_package = mergeObjectFields(basePackage, incoming, {
+      mergeKeys: {
+        user_flow: "string",
+        acceptance_criteria: "string",
+        edge_cases: "string",
+        copy_notes: "string",
+      },
+    });
+    if (Array.isArray(incoming.analytics_events)) {
+      nextCaseFile.work_package.analytics_events = mergeArrayByKey(
+        basePackage.analytics_events,
+        incoming.analytics_events,
+        "event",
+        { properties: "string" }
+      );
+    }
   }
 
-  if (patch.solution_options) {
-    nextCaseFile.solution_options = mergeSolutionOptions(
-      base.solution_options,
-      patch.solution_options
-    );
-  }
-
-  if (patch.recommendation) {
-    nextCaseFile.recommendation = mergeObjectFields(
-      base.recommendation,
-      patch.recommendation,
-      {
-        mergeKeys: {
-          why: "string",
-          tradeoffs: "string",
-          first_week_plan: "string",
-          first_validation_steps: "string",
-          if_assumptions_wrong: "string",
-        },
-      }
-    );
+  if (patch.backlog) {
+    const baseBacklog = base.backlog || {};
+    const incoming = patch.backlog || {};
+    nextCaseFile.backlog = {
+      research_tasks: mergeArrayByKey(
+        baseBacklog.research_tasks,
+        incoming.research_tasks,
+        "title",
+        { definition_of_done: "string" }
+      ),
+      design_tasks: mergeArrayByKey(
+        baseBacklog.design_tasks,
+        incoming.design_tasks,
+        "title",
+        { definition_of_done: "string" }
+      ),
+      analytics_tasks: mergeArrayByKey(
+        baseBacklog.analytics_tasks,
+        incoming.analytics_tasks,
+        "title",
+        { definition_of_done: "string" }
+      ),
+      dev_tasks: mergeArrayByKey(
+        baseBacklog.dev_tasks,
+        incoming.dev_tasks,
+        "title",
+        { definition_of_done: "string" }
+      ),
+    };
   }
 
   return nextCaseFile;
@@ -289,7 +306,8 @@ async function updateCaseFile(cardType, cardText, caseFile, task, context) {
     "- Do NOT restate the entire caseFile.",
     "- Omit empty fields; do not include nulls or empty arrays.",
     "- Avoid duplicates; reuse existing entities where possible.",
-    "- Assumptions unique by text; hypotheses unique by statement; scenarios unique by name; success_criteria unique by criterion.",
+    "- Dedupe strings case-insensitively.",
+    "- Dedupe directions by id; metrics by name; tasks by title.",
     "- Keep output short (<= 500 tokens).",
     "",
     "caseFile schema:",
