@@ -446,8 +446,13 @@ function buildContextSummary(currentAnalysis, keyToSkip) {
       if (typeof value === "string") {
         return `${key}: ${value}`;
       }
-      if (typeof value === "object" && typeof value.full === "string") {
-        return `${key}: ${value.full}`;
+      if (typeof value === "object") {
+        if (typeof value.value === "string") {
+          return `${key}: ${value.value}`;
+        }
+        if (typeof value.full === "string") {
+          return `${key}: ${value.full}`;
+        }
       }
       return null;
     })
@@ -637,116 +642,65 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
   return content.trim();
 }
 
-async function runKeySummary({
-  key,
-  full,
-  task,
-  context,
-  language,
-  caseFile,
-  signal,
-}) {
+function buildSummaryPrompt({ key, language, fullValue }) {
   const languageLabel = languageLabels[language] || "English";
-  const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
-  const promptBase = [
+  return [
     "You are a senior product designer + product thinker.",
     `Summarize the "${key}" card into a short, decision-grade digest.`,
     `Write in ${languageLabel}.`,
     "Summary rules (strict):",
-    "- Max 2400 characters (hard limit).",
-    "- Plain text only. No markdown. No tables. No symbols like # or ###.",
-    "- Use only these headings (UPPERCASE):",
-    "  - If Russian: ПРОБЛЕМА / НЕИЗВЕСТНОЕ / НАПРАВЛЕНИЕ / СЛЕДУЮЩИЕ ДЕЙСТВИЯ (24–72 ч)",
-    "  - If English: PROBLEM / UNKNOWNs / DIRECTION / NEXT (24–72h)",
-    "- Use '-' bullets only. 8–14 bullets total across all sections.",
-    "- Do not invent new info. Do not contradict the full output.",
-    "- Do not introduce new directions, metrics, targets, or success criteria.",
-    "- Keep bullets short and scannable.",
-    "",
-    "Key-specific guidance (strict):",
-    "- framing: include problem, desired outcome, leverage point, constraints.",
-    "- unknowns: top 3 blocking unknowns + fastest validations (PROBLEM can be 1 line).",
-    "- solution_space: 3–5 direction names with 1-line reason each; include UNKNOWN only if relevant.",
-    "- decision: include criteria (2–4 bullets), recommended pick, backup pick, and main trade-off.",
-    "- experiment_plan: list tests, what success means, and instrumentation.",
-    "- work_package: flow steps, acceptance criteria highlights, analytics events.",
-    "",
-    "Section emphasis by key (use only the headings above):",
-    "- framing: use all four sections.",
-    "- unknowns: focus mainly on UNKNOWN and NEXT.",
-    "- solution_space: focus on DIRECTION and UNKNOWN (if relevant).",
-    "- decision: focus on DIRECTION and NEXT; include criteria bullets.",
-    "- experiment_plan: focus on NEXT and DIRECTION; include measurement + instrumentation.",
-    "- work_package: focus on DIRECTION and NEXT; include acceptance criteria + events.",
-    "",
-    "TASK:",
-    task,
-    "",
-    "CONTEXT:",
-    context || "(none)",
-    "",
-    "CASE FILE (JSON):",
-    serializedCaseFile || "(none)",
+    "- Plain text only. No markdown symbols (#, ###, **). No JSON. No tables.",
+    "- Medium-short summary: ~10–18 bullets total OR 1–2 short paragraphs plus bullets.",
+    "- Must be scannable with 3–6 short chunks (blocks).",
+    "- Each chunk starts with a short label (2–4 words) on its own line, followed by ':'",
+    "- Labels must be chosen dynamically based on content; do not use the same set every time.",
+    "- Avoid repeating the same label across keys unless it naturally fits.",
+    "- Use '-' bullets for lists; keep bullets short (1 line when possible).",
+    "- Allow 1–2 short paragraphs (2–4 lines) if needed, otherwise bullets.",
+    "- Do NOT introduce new metrics, directions, assumptions, or success criteria.",
+    "- Do NOT contradict the full output.",
+    "- Avoid repetition: no duplicated chunks or rephrased points.",
+    "- Language must match the full output (Russian/English).",
     "",
     "FULL OUTPUT TO SUMMARIZE:",
-    full,
+    fullValue,
+    "",
+    "Return only the summary. No extra text.",
   ].join("\n");
+}
 
-  const runOnce = async (prefix, prompt) => {
-    const result = await runWithTimeout(
-      prefix,
-      OPENAI_TIMEOUT_MS,
-      (signal) =>
-        openaiClient.chat.completions.create(
-          {
-            model: OPENAI_MODEL,
-            messages: [
-              {
-                role: "system",
-                content:
-                  "Return a short, bullet-driven summary with strict headings.",
-              },
-              { role: "user", content: prompt },
-            ],
-            temperature: 0.25,
-            max_tokens: 500,
-          },
-          { signal }
-        ),
-      { signal }
-    );
-    if (!result.ok) {
-      throw result.error;
-    }
-    return result.value;
-  };
+async function runSummary({ key, language, fullValue, signal }) {
+  const prompt = buildSummaryPrompt({ key, language, fullValue });
+  const result = await runWithTimeout(
+    `OpenAI summary ${key} request`,
+    OPENAI_TIMEOUT_MS,
+    (signal) =>
+      openaiClient.chat.completions.create(
+        {
+          model: OPENAI_MODEL,
+          messages: [
+            {
+              role: "system",
+              content: "Return only the summary in plain text.",
+            },
+            { role: "user", content: prompt },
+          ],
+          temperature: 0.3,
+          max_tokens: 380,
+        },
+        { signal }
+      ),
+    { signal }
+  );
+  if (!result.ok) {
+    throw result.error;
+  }
 
-  let response = await runOnce(`OpenAI summary ${key} request`, promptBase);
-  let content = response?.choices?.[0]?.message?.content;
+  const content = result.value?.choices?.[0]?.message?.content;
   if (!content || typeof content !== "string") {
     throw new Error("OpenAI summary response was empty");
   }
-  content = content.trim();
-
-  if (content.length > 2400) {
-    response = await runOnce(
-      `OpenAI summary ${key} retry`,
-      [
-        "Your previous summary was too long.",
-        "Rewrite it to be <= 2400 characters.",
-        "Keep the same strict format and required headings.",
-        "",
-        promptBase,
-      ].join("\n")
-    );
-    content = response?.choices?.[0]?.message?.content;
-    if (!content || typeof content !== "string") {
-      throw new Error("OpenAI summary response was empty");
-    }
-    content = content.trim();
-  }
-
-  return content;
+  return content.trim();
 }
 
 async function runDeeper({
@@ -985,17 +939,19 @@ app.post("/analyze", async (req, res) => {
         console.warn(`[casefile] update failed after ${key}:`, updateError);
       }
       caseFile = updatedCaseFile;
-      const summary = await runKeySummary({
-        key,
-        full,
-        task,
-        context,
-        language,
-        caseFile,
-      });
+      let summary = "";
+      try {
+        summary = await runSummary({
+          key,
+          language,
+          fullValue: full,
+        });
+      } catch (summaryError) {
+        console.warn(`[summary] failed for key=${key}:`, summaryError);
+      }
       analysis[key] = {
         summary,
-        full: appendDebugLine(full, caseFile),
+        value: appendDebugLine(full, caseFile),
       };
     }
 
@@ -1084,19 +1040,21 @@ app.post("/analyze/stream", async (req, res) => {
           console.warn(`[casefile] update failed after ${key}:`, updateError);
         }
 
-        const summary = await runKeySummary({
-          key,
-          full: value,
-          task,
-          context,
-          language,
-          caseFile,
-        });
+        let summary = "";
+        try {
+          summary = await runSummary({
+            key,
+            language,
+            fullValue: value,
+          });
+        } catch (summaryError) {
+          console.warn(`[summary] failed for key=${key}:`, summaryError);
+        }
         const valueWithDebug = appendDebugLine(value, caseFile);
         writeSseEvent(res, "key", {
           key,
           summary,
-          full: valueWithDebug,
+          value: valueWithDebug,
           status: "ok",
         });
         console.log(`[stream] done key=${key} ok`);
@@ -1171,19 +1129,21 @@ app.post("/analyze/deeper", async (req, res) => {
       currentAnalysis,
       caseFile,
     });
-    const summary = await runKeySummary({
-      key,
-      full: value,
-      task,
-      context,
-      language,
-      caseFile,
-    });
+    let summary = "";
+    try {
+      summary = await runSummary({
+        key,
+        language,
+        fullValue: value,
+      });
+    } catch (summaryError) {
+      console.warn(`[summary] failed for key=${key}:`, summaryError);
+    }
 
     return res.json({
       key,
       summary,
-      full: appendDebugLine(value, caseFile),
+      value: appendDebugLine(value, caseFile),
       language,
     });
   } catch (err) {
@@ -1236,19 +1196,21 @@ app.post("/analyze/verify", async (req, res) => {
       value,
       caseFile,
     });
-    const summary = await runKeySummary({
-      key,
-      full: updatedValue,
-      task,
-      context,
-      language,
-      caseFile,
-    });
+    let summary = "";
+    try {
+      summary = await runSummary({
+        key,
+        language,
+        fullValue: updatedValue,
+      });
+    } catch (summaryError) {
+      console.warn(`[summary] failed for key=${key}:`, summaryError);
+    }
 
     return res.json({
       key,
       summary,
-      full: appendDebugLine(updatedValue, caseFile),
+      value: appendDebugLine(updatedValue, caseFile),
       language,
     });
   } catch (err) {
