@@ -74,7 +74,7 @@ const ensureKeyState = (key) => {
   if (!analysisState[key]) {
     analysisState[key] = {
       summary: "",
-      full: "",
+      value: "",
       isExpanded: false,
       status: "idle",
       error: null,
@@ -83,9 +83,9 @@ const ensureKeyState = (key) => {
 };
 
 const getSummaryValue = (key) =>
-  analysisState[key]?.summary || analysisState[key]?.full || "";
+  analysisState[key]?.summary || analysisState[key]?.value || "";
 const getFullValue = (key) =>
-  analysisState[key]?.full || analysisState[key]?.summary || "";
+  analysisState[key]?.value || analysisState[key]?.summary || "";
 const isExpanded = (key) => analysisState[key]?.isExpanded === true;
 
 const getDisplayedValue = (key) =>
@@ -93,15 +93,15 @@ const getDisplayedValue = (key) =>
 
 const getFullAnalysisMap = () =>
   Object.entries(analysisState).reduce((acc, [key, value]) => {
-    acc[key] = value.full || value.summary || "";
+    acc[key] = value.value || value.summary || "";
     return acc;
   }, {});
 
 const shouldShowToggle = (key) => {
-  const summary = getSummaryValue(key).trim();
-  const full = getFullValue(key).trim();
-  if (!summary || !full) return false;
-  return summary !== full;
+  const summary = (analysisState[key]?.summary || "").trim();
+  const value = (analysisState[key]?.value || "").trim();
+  if (!summary || !value) return false;
+  return summary !== value;
 };
 
 const setToggleButtonState = (card, key) => {
@@ -169,60 +169,7 @@ const ensureCard = (key, { moveToEnd = false } = {}) => {
 
 const renderPlainText = (text, container) => {
   if (!container) return;
-  container.innerHTML = "";
-
-  if (!text) return;
-
-  const lines = text.split("\n");
-  const fragment = document.createDocumentFragment();
-  let listElement = null;
-
-  const flushList = () => {
-    if (listElement) {
-      fragment.appendChild(listElement);
-      listElement = null;
-    }
-  };
-
-  lines.forEach((rawLine) => {
-    const line = rawLine.replace(/\r$/, "");
-    if (!line.trim()) {
-      flushList();
-      const spacer = document.createElement("div");
-      spacer.className = "card-spacer";
-      fragment.appendChild(spacer);
-      return;
-    }
-
-    if (line.startsWith("### ")) {
-      flushList();
-      const heading = document.createElement("h4");
-      heading.className = "card-heading";
-      heading.textContent = line.slice(4);
-      fragment.appendChild(heading);
-      return;
-    }
-
-    if (line.startsWith("- ")) {
-      if (!listElement) {
-        listElement = document.createElement("ul");
-        listElement.className = "card-list";
-      }
-      const listItem = document.createElement("li");
-      listItem.textContent = line.slice(2);
-      listElement.appendChild(listItem);
-      return;
-    }
-
-    flushList();
-    const paragraph = document.createElement("p");
-    paragraph.className = "card-paragraph";
-    paragraph.textContent = line;
-    fragment.appendChild(paragraph);
-  });
-
-  flushList();
-  container.appendChild(fragment);
+  container.textContent = text || "";
 };
 
 const setCardLoading = (
@@ -260,22 +207,26 @@ const updateCardContent = (key) => {
   if (!card) return;
   const body = card.querySelector(".card-content");
   if (body) {
-    const displayed = getDisplayedValue(key);
+    const summary = analysisState[key]?.summary ?? "";
+    const value = analysisState[key]?.value ?? "";
+    const showSummary = !isExpanded(key) && summary.trim().length > 0;
+    const displayed = showSummary ? summary : value || summary;
     const isLoading = analysisState[key]?.status === "loading";
     const contentText =
       displayed || (isLoading ? "Analyzing..." : "No details yet.");
     renderPlainText(contentText, body);
+    body.classList.toggle("is-summary", showSummary);
   }
   setToggleButtonState(card, key);
 };
 
-const updateAnalysisKey = (key, summaryValue, fullValue) => {
+const updateAnalysisKey = (key, summaryValue, valueValue) => {
   if (!isSupportedKey(key)) return;
   ensureKeyState(key);
-  const resolvedSummary = summaryValue || fullValue || "";
-  const resolvedFull = fullValue || summaryValue || "";
+  const resolvedSummary = summaryValue ?? "";
+  const resolvedValue = valueValue ?? summaryValue ?? "";
   analysisState[key].summary = resolvedSummary;
-  analysisState[key].full = resolvedFull;
+  analysisState[key].value = resolvedValue;
   analysisState[key].status = "done";
   analysisState[key].error = null;
   const card = ensureCard(key);
@@ -340,12 +291,8 @@ const updateProgress = (completed, total) => {
 };
 
 const applyAnalysisResponse = (data) => {
-  const summary =
+  const analysis =
     data?.analysis && typeof data.analysis === "object" ? data.analysis : {};
-  const full =
-    data?.analysis_full && typeof data.analysis_full === "object"
-      ? data.analysis_full
-      : {};
 
   if (elements.resultsList) {
     elements.resultsList.innerHTML = "";
@@ -355,10 +302,17 @@ const applyAnalysisResponse = (data) => {
 
   DEFAULT_KEYS.forEach((key) => {
     ensureKeyState(key);
-    const summaryValue = summary[key] || "";
-    const fullValue = full[key] || summaryValue;
-    analysisState[key].summary = summaryValue;
-    analysisState[key].full = fullValue;
+    const entry = analysis[key];
+    if (typeof entry === "string") {
+      analysisState[key].summary = "";
+      analysisState[key].value = entry;
+    } else if (entry && typeof entry === "object") {
+      analysisState[key].summary = entry.summary ?? "";
+      analysisState[key].value = entry.value ?? entry.summary ?? "";
+    } else {
+      analysisState[key].summary = "";
+      analysisState[key].value = "";
+    }
     analysisState[key].status = "done";
     analysisState[key].error = null;
     ensureCard(key);
@@ -432,9 +386,9 @@ const streamAnalysis = async ({
           if (onKey) {
             onKey(payload);
           } else {
-            const summaryValue = payload.summary ?? payload.full ?? "";
-            const fullValue = payload.full ?? payload.summary ?? "";
-            updateAnalysisKey(payload.key, summaryValue, fullValue);
+            const summaryValue = payload.summary ?? "";
+            const valueValue = payload.value ?? payload.summary ?? "";
+            updateAnalysisKey(payload.key, summaryValue, valueValue);
           }
         }
       } catch (error) {
@@ -608,9 +562,9 @@ const analyzeTask = async () => {
         }
       },
       onKey: (payload) => {
-        const summaryValue = payload.summary ?? payload.full ?? "";
-        const fullValue = payload.full ?? payload.summary ?? "";
-        updateAnalysisKey(payload.key, summaryValue, fullValue);
+        const summaryValue = payload.summary ?? "";
+        const valueValue = payload.value ?? payload.summary ?? "";
+        updateAnalysisKey(payload.key, summaryValue, valueValue);
       },
       onError: (payload) => {
         if (payload?.key) {
@@ -720,7 +674,7 @@ const handleCardAction = async (action, key, cardElement) => {
       throw new Error("Unexpected response from API.");
     }
 
-    updateAnalysisKey(key, data.value, data.full ?? data.value);
+    updateAnalysisKey(key, data.summary ?? "", data.value ?? data.summary ?? "");
     showToast(action === "deeper" ? "Deeper analysis ready." : "Updated.");
   } catch (error) {
     setCardLoading(key, false);

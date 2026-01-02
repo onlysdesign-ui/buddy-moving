@@ -225,6 +225,12 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  white-space: pre-wrap;
+}
+
+.card-content.is-summary {
+  font-size: 0.92rem;
+  color: #b4bac1;
 }
 
 .card-heading {
