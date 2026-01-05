@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Regression tests</title>
+    <base href="/buddy-moving/" />
+    <link rel="stylesheet" href="tests/tests.css" />
+  </head>
+  <body>
+    <main class="tests-page">
+      <header class="tests-header">
+        <div>
+          <h1>Regression tests</h1>
+        </div>
+        <div class="tests-actions">
+          <button class="primary" id="run-tests" type="button">
+            Прогнать тесты
+          </button>
+          <button class="secondary" id="cancel-tests" type="button" hidden>
+            Cancel
+          </button>
+          <div class="tests-status" id="tests-status"></div>
+        </div>
+      </header>
+      <section id="tests-history" class="tests-history"></section>
+    </main>
+    <script type="module" src="tests/runTests.js"></script>
+  </body>
+</html>

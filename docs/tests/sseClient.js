@@ -1,14 +1,7 @@
-interface StreamOptions {
-  url: string;
-  payload: unknown;
-  signal?: AbortSignal;
-  onEvent?: (event: string, data: string) => void;
-}
-
-const parseSseEvent = (rawEvent: string) => {
+const parseSseEvent = (rawEvent) => {
   const lines = rawEvent.split("\n");
   let event = "message";
-  const dataLines: string[] = [];
+  const dataLines = [];
 
   for (const line of lines) {
     if (!line || line.startsWith(":")) continue;
@@ -24,7 +17,7 @@ const parseSseEvent = (rawEvent: string) => {
   return { event, data: dataLines.join("\n") };
 };
 
-export const streamSse = async ({ url, payload, signal, onEvent }: StreamOptions) => {
+export const streamSse = async ({ url, payload, signal, onEvent }) => {
   const response = await fetch(url, {
     method: "POST",
     headers: {
