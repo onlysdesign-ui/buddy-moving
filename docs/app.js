@@ -1,4 +1,8 @@
-const API_BASE = "https://buddy-moving.onrender.com";
+const API_BASE = (
+  globalThis?.VITE_BACKEND_URL ||
+  globalThis?.VITE_API_BASE ||
+  "http://localhost:3000"
+).replace(/\/$/, "");
 const DEFAULT_KEYS = [
   "framing",
   "unknowns",
@@ -21,6 +25,9 @@ const STORAGE_KEYS = {
   context: "buddyMoving.context",
   contextUpdatedAt: "buddyMoving.contextUpdatedAt",
 };
+const TESTS_STORAGE_KEY = "buddy_tests_runs";
+const TESTS_DATA_URL = new URL("tests/eval_cases_v2.json", document.baseURI);
+const TEST_CASE_DELAY_MS = 300;
 const DEBUG_STREAM =
   String(globalThis?.VITE_DEBUG_STREAM ?? "").toLowerCase() === "true";
 
@@ -34,12 +41,28 @@ const elements = {
   statusText: document.getElementById("status-text"),
   toast: document.getElementById("toast"),
   resultsList: document.getElementById("results-list"),
+  analysisPage: document.getElementById("analysis-page"),
+  testsPage: document.getElementById("tests-page"),
+  navButtons: document.querySelectorAll("[data-route]"),
+  testsRun: document.getElementById("tests-run"),
+  testsCancel: document.getElementById("tests-cancel"),
+  testsStatus: document.getElementById("tests-status"),
+  testsHistory: document.getElementById("tests-history"),
 };
 
 let analysisState = {};
 let activeStreamController = null;
 let activeStreamId = 0;
 let progressState = { completed: 0, total: 0 };
+
+const testsState = {
+  data: null,
+  runs: [],
+  currentRun: null,
+  running: false,
+  cancelRequested: false,
+  activeController: null,
+};
 
 const showToast = (message, type = "success") => {
   elements.toast.textContent = message;
@@ -347,6 +370,8 @@ const streamAnalysis = async ({
   onKey,
   onError,
   onStatus,
+  onDone,
+  quiet = false,
 }) => {
   const response = await fetch(`${API_BASE}/analyze/stream`, {
     method: "POST",
@@ -423,9 +448,13 @@ const streamAnalysis = async ({
         } else if (payload?.key) {
           setCardError(payload.key, payload.error, payload.details);
         }
-        showToast(payload?.error || "Analysis failed.", "error");
+        if (!quiet) {
+          showToast(payload?.error || "Analysis failed.", "error");
+        }
       } catch (error) {
-        showToast("Analysis failed.", "error");
+        if (!quiet) {
+          showToast("Analysis failed.", "error");
+        }
       }
     }
 
@@ -434,6 +463,9 @@ const streamAnalysis = async ({
         console.info("[stream] done");
       }
       sawDone = true;
+      if (onDone) {
+        onDone();
+      }
     }
   };
 
@@ -464,7 +496,7 @@ const streamAnalysis = async ({
     if (signal?.aborted) {
       return;
     }
-    if (!sawDone) {
+    if (!sawDone && !quiet) {
       showToast("Stream ended early. Analysis marked complete.", "error");
     }
   }
@@ -736,10 +768,542 @@ const updateContextIndicator = () => {
     : "Context set";
 };
 
+const getBasePath = () => new URL(document.baseURI).pathname.replace(/\/$/, "");
+
+const normalizeRoute = (pathname) => {
+  const basePath = getBasePath();
+  const trimmed = pathname.startsWith(basePath)
+    ? pathname.slice(basePath.length)
+    : pathname;
+  return trimmed === "" ? "/" : trimmed;
+};
+
+const setActiveRoute = (route) => {
+  const normalized = route === "/tests" ? "/tests" : "/";
+  const isTests = normalized === "/tests";
+  if (elements.analysisPage) {
+    elements.analysisPage.hidden = isTests;
+  }
+  if (elements.testsPage) {
+    elements.testsPage.hidden = !isTests;
+  }
+  elements.navButtons?.forEach((button) => {
+    button.classList.toggle("is-active", button.dataset.route === normalized);
+  });
+};
+
+const navigateTo = (route) => {
+  const basePath = getBasePath();
+  const target = route === "/" ? `${basePath || "/"}` : `${basePath}${route}`;
+  window.history.pushState({}, "", target);
+  setActiveRoute(route);
+};
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const loadStoredRuns = () => {
+  try {
+    const raw = localStorage.getItem(TESTS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch (error) {
+    console.warn("Failed to parse stored test runs", error);
+    return [];
+  }
+};
+
+const saveStoredRuns = (runs) => {
+  try {
+    localStorage.setItem(TESTS_STORAGE_KEY, JSON.stringify(runs));
+  } catch (error) {
+    console.warn("Failed to save test runs", error);
+  }
+};
+
+const getTestsData = async () => {
+  if (testsState.data) return testsState.data;
+  const response = await fetch(TESTS_DATA_URL);
+  if (!response.ok) {
+    throw new Error(`Failed to load test cases (${response.status})`);
+  }
+  const data = await response.json();
+  const contextsById = new Map(
+    (data.contexts || []).map((context) => [context.contextId, context]),
+  );
+  const casesByContext = (data.cases || []).reduce((acc, testCase) => {
+    if (!acc[testCase.contextId]) {
+      acc[testCase.contextId] = [];
+    }
+    acc[testCase.contextId].push(testCase);
+    return acc;
+  }, {});
+  testsState.data = { ...data, contextsById, casesByContext };
+  return testsState.data;
+};
+
+const formatRunDate = (isoString) => {
+  if (!isoString) return "Unknown date";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.valueOf())) return "Unknown date";
+  return date.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+};
+
+const formatDuration = (start, end) => {
+  if (!start || !end) return "—";
+  const durationMs = new Date(end).valueOf() - new Date(start).valueOf();
+  if (!Number.isFinite(durationMs) || durationMs < 0) return "—";
+  const seconds = Math.round(durationMs / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}m ${remainder}s`;
+};
+
+const formatStatusLabel = (status) => {
+  if (status === "success") return "Success";
+  if (status === "failed") return "Failed";
+  if (status === "partial") return "Partial";
+  if (status === "running") return "Running";
+  return status || "Unknown";
+};
+
+const createBadge = (text, className) => {
+  const badge = document.createElement("span");
+  badge.className = `badge ${className || ""}`.trim();
+  badge.textContent = text;
+  return badge;
+};
+
+const createCaseTag = (text) => {
+  const tag = document.createElement("span");
+  tag.className = "tag";
+  tag.textContent = text;
+  return tag;
+};
+
+const buildCaseDetails = (caseResult) => {
+  const details = document.createElement("details");
+  details.className = "case-row";
+  const summary = document.createElement("summary");
+  const summaryContent = document.createElement("div");
+  summaryContent.className = "case-summary";
+
+  const badges = document.createElement("div");
+  badges.className = "case-badges";
+  badges.appendChild(createBadge(caseResult.scale || "n/a", caseResult.scale));
+  badges.appendChild(
+    createBadge(caseResult.ok ? "OK" : "Fail", caseResult.ok ? "success" : "failed"),
+  );
+
+  const meta = document.createElement("div");
+  meta.className = "case-summary-meta";
+  const title = document.createElement("div");
+  title.className = "case-title";
+  title.textContent = caseResult.title || "Untitled case";
+  const tags = document.createElement("div");
+  tags.className = "case-tags";
+  const tagList = Array.isArray(caseResult.tags) ? caseResult.tags : [];
+  tagList.slice(0, 3).forEach((tag) => tags.appendChild(createCaseTag(tag)));
+  if (tagList.length > 3) {
+    tags.appendChild(createCaseTag(`+${tagList.length - 3}`));
+  }
+  meta.appendChild(title);
+  meta.appendChild(tags);
+
+  const metaRight = document.createElement("div");
+  metaRight.className = "case-meta-right";
+  const duration = document.createElement("span");
+  duration.textContent = `Duration: ${formatDuration(
+    caseResult.startedAt,
+    caseResult.finishedAt,
+  )}`;
+  metaRight.appendChild(duration);
+
+  summaryContent.appendChild(badges);
+  summaryContent.appendChild(meta);
+  summaryContent.appendChild(metaRight);
+  summary.appendChild(summaryContent);
+  details.appendChild(summary);
+
+  const detailsBody = document.createElement("div");
+  detailsBody.className = "case-details";
+
+  if (caseResult.error) {
+    const errorBlock = document.createElement("div");
+    errorBlock.className = "case-key-summary";
+    errorBlock.textContent = `Error: ${caseResult.error}`;
+    detailsBody.appendChild(errorBlock);
+  }
+
+  const analysisEntries = caseResult.analysis
+    ? DEFAULT_KEYS.filter((key) => caseResult.analysis[key]).map((key) => [
+        key,
+        caseResult.analysis[key],
+      ])
+    : [];
+  if (analysisEntries.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "case-key-summary";
+    empty.textContent = "No analysis generated for this case.";
+    detailsBody.appendChild(empty);
+  } else {
+    analysisEntries.forEach(([key, value]) => {
+      const keyBlock = document.createElement("div");
+      keyBlock.className = "case-key";
+
+      const header = document.createElement("div");
+      header.className = "case-key-header";
+      const name = document.createElement("span");
+      name.className = "case-key-name";
+      name.textContent = key;
+      header.appendChild(name);
+
+      const toggle = document.createElement("button");
+      toggle.className = "case-key-toggle";
+      toggle.type = "button";
+      toggle.textContent = "Show full";
+
+      const summary = document.createElement("div");
+      summary.className = "case-key-summary";
+      summary.textContent = (value?.summary || value?.value || "").trim();
+
+      const full = document.createElement("pre");
+      full.className = "case-key-full";
+      full.textContent = (value?.value || value?.summary || "").trim();
+      full.hidden = true;
+
+      const hasToggle =
+        summary.textContent &&
+        full.textContent &&
+        summary.textContent !== full.textContent;
+      if (hasToggle) {
+        header.appendChild(toggle);
+        toggle.addEventListener("click", () => {
+          const isHidden = full.hidden;
+          full.hidden = !isHidden;
+          toggle.textContent = isHidden ? "Hide full" : "Show full";
+        });
+      } else {
+        toggle.hidden = true;
+      }
+
+      keyBlock.appendChild(header);
+      keyBlock.appendChild(summary);
+      if (full.textContent) {
+        keyBlock.appendChild(full);
+      }
+      detailsBody.appendChild(keyBlock);
+    });
+  }
+
+  details.appendChild(detailsBody);
+  return details;
+};
+
+const buildRunCard = (run, { expanded = false } = {}) => {
+  const details = document.createElement("details");
+  details.className = "run-card";
+  details.open = expanded;
+
+  const summary = document.createElement("summary");
+  const summaryContent = document.createElement("div");
+  summaryContent.className = "run-summary";
+
+  const meta = document.createElement("div");
+  meta.className = "run-meta";
+  const date = document.createElement("span");
+  date.textContent = formatRunDate(run.createdAt);
+  const statusLabel = run.status || "running";
+  const badgeClass = statusLabel === "running" ? "partial" : statusLabel;
+  const statusBadge = createBadge(formatStatusLabel(statusLabel), badgeClass);
+  meta.appendChild(date);
+  meta.appendChild(statusBadge);
+
+  const counts = document.createElement("span");
+  const succeeded = run.summary?.succeeded ?? 0;
+  const failed = run.summary?.failed ?? 0;
+  counts.textContent = `Passed ${succeeded} · Failed ${failed}`;
+
+  summaryContent.appendChild(meta);
+  summaryContent.appendChild(counts);
+  summary.appendChild(summaryContent);
+  details.appendChild(summary);
+
+  const body = document.createElement("div");
+  body.className = "run-details";
+
+  const data = testsState.data;
+  const contexts = data?.contexts || [];
+  const resultsByContext = (run.results || []).reduce((acc, result) => {
+    if (!acc[result.contextId]) {
+      acc[result.contextId] = [];
+    }
+    acc[result.contextId].push(result);
+    return acc;
+  }, {});
+
+  const contextsToRender =
+    contexts.length > 0
+      ? contexts
+      : Object.keys(resultsByContext).map((contextId) => ({
+          contextId,
+          title: contextId,
+        }));
+
+  contextsToRender.forEach((context) => {
+    const cases = resultsByContext[context.contextId];
+    if (!cases || cases.length === 0) return;
+    const block = document.createElement("div");
+    block.className = "context-block";
+    const title = document.createElement("div");
+    title.className = "context-title";
+    title.textContent = context.title || context.contextId;
+    block.appendChild(title);
+    cases.forEach((caseResult) => {
+      block.appendChild(buildCaseDetails(caseResult));
+    });
+    body.appendChild(block);
+  });
+
+  if (!body.childElementCount) {
+    const empty = document.createElement("div");
+    empty.className = "case-key-summary";
+    empty.textContent = "No results captured for this run yet.";
+    body.appendChild(empty);
+  }
+
+  details.appendChild(body);
+  return details;
+};
+
+const renderTestsHistory = () => {
+  if (!elements.testsHistory) return;
+  elements.testsHistory.innerHTML = "";
+  const runs = testsState.currentRun
+    ? [testsState.currentRun, ...testsState.runs]
+    : testsState.runs;
+  if (!runs.length) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "No test runs yet. Start a run to see results here.";
+    elements.testsHistory.appendChild(empty);
+    return;
+  }
+  const expandedId = runs[0]?.id;
+  runs.forEach((run) => {
+    elements.testsHistory.appendChild(
+      buildRunCard(run, { expanded: run.id === expandedId }),
+    );
+  });
+};
+
+const setTestsStatus = (text) => {
+  if (!elements.testsStatus) return;
+  elements.testsStatus.textContent = text || "";
+};
+
+const setTestsRunning = (isRunning) => {
+  testsState.running = isRunning;
+  if (elements.testsRun) {
+    elements.testsRun.disabled = isRunning;
+  }
+  if (elements.testsCancel) {
+    elements.testsCancel.hidden = !isRunning;
+  }
+};
+
+const runSingleTestCase = async (testCase, contextText) => {
+  const startedAt = new Date().toISOString();
+  const analysis = {};
+  const keyStatuses = {};
+  let sawDone = false;
+  let language = null;
+  let errorMessage = null;
+  const controller = new AbortController();
+  testsState.activeController = controller;
+
+  try {
+    await streamAnalysis({
+      task: testCase.task,
+      context: contextText,
+      keys: DEFAULT_KEYS,
+      signal: controller.signal,
+      quiet: true,
+      onStatus: (payload) => {
+        if (payload?.language) {
+          language = payload.language;
+        }
+      },
+      onKey: (payload) => {
+        if (!payload?.key) return;
+        analysis[payload.key] = {
+          summary: payload.summary ?? "",
+          value: payload.value ?? payload.summary ?? "",
+        };
+        if (payload.status) {
+          keyStatuses[payload.key] = payload.status;
+        }
+      },
+      onError: (payload) => {
+        errorMessage =
+          payload?.error ||
+          payload?.details ||
+          errorMessage ||
+          "Unknown error";
+        if (payload?.key && payload.status) {
+          keyStatuses[payload.key] = payload.status;
+        }
+      },
+      onDone: () => {
+        sawDone = true;
+      },
+    });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      errorMessage = "Cancelled";
+    } else {
+      errorMessage = error.message || "Request failed";
+    }
+  } finally {
+    testsState.activeController = null;
+  }
+
+  const finishedAt = new Date().toISOString();
+  const succeededKeys = Object.values(keyStatuses).filter(
+    (status) => status === "ok",
+  ).length;
+  const ok = sawDone && succeededKeys >= 3 && !errorMessage;
+
+  return {
+    caseId: testCase.id,
+    contextId: testCase.contextId,
+    title: testCase.title,
+    scale: testCase.scale,
+    tags: testCase.tags,
+    startedAt,
+    finishedAt,
+    ok,
+    language,
+    error: errorMessage || undefined,
+    analysis: Object.keys(analysis).length ? analysis : undefined,
+  };
+};
+
+const startTestsRun = async () => {
+  if (testsState.running) return;
+  testsState.cancelRequested = false;
+  setTestsRunning(true);
+  setTestsStatus("Loading test cases...");
+
+  let data;
+  try {
+    data = await getTestsData();
+  } catch (error) {
+    showToast(`Failed to load tests. ${error.message}`, "error");
+    setTestsRunning(false);
+    setTestsStatus("");
+    return;
+  }
+
+  const run = {
+    id: `run_${Date.now()}`,
+    createdAt: new Date().toISOString(),
+    status: "running",
+    summary: {
+      totalCases: data.cases.length,
+      succeeded: 0,
+      failed: 0,
+    },
+    results: [],
+  };
+
+  testsState.currentRun = run;
+  renderTestsHistory();
+
+  for (let index = 0; index < data.cases.length; index += 1) {
+    if (testsState.cancelRequested) break;
+    const testCase = data.cases[index];
+    const context = data.contextsById.get(testCase.contextId);
+    const contextText = context?.context || "";
+    setTestsStatus(`Running... ${index + 1}/${data.cases.length}`);
+
+    const result = await runSingleTestCase(testCase, contextText);
+    run.results.push(result);
+    if (result.ok) {
+      run.summary.succeeded += 1;
+    } else {
+      run.summary.failed += 1;
+    }
+    renderTestsHistory();
+
+    if (index < data.cases.length - 1 && !testsState.cancelRequested) {
+      await delay(TEST_CASE_DELAY_MS);
+    }
+  }
+
+  run.status =
+    run.summary.failed === 0
+      ? "success"
+      : run.summary.succeeded === 0
+        ? "failed"
+        : "partial";
+
+  testsState.currentRun = null;
+  testsState.runs = [run, ...testsState.runs].sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+  saveStoredRuns(testsState.runs);
+  renderTestsHistory();
+  setTestsRunning(false);
+  setTestsStatus("");
+};
+
+const cancelTestsRun = () => {
+  if (!testsState.running) return;
+  testsState.cancelRequested = true;
+  if (testsState.activeController) {
+    testsState.activeController.abort();
+  }
+  setTestsStatus("Cancelling...");
+};
+
+const initTests = async () => {
+  testsState.runs = loadStoredRuns().sort(
+    (a, b) => new Date(b.createdAt) - new Date(a.createdAt),
+  );
+  renderTestsHistory();
+
+  try {
+    await getTestsData();
+    renderTestsHistory();
+  } catch (error) {
+    console.warn("Failed to load tests data", error);
+  }
+
+  elements.testsRun?.addEventListener("click", startTestsRun);
+  elements.testsCancel?.addEventListener("click", cancelTestsRun);
+};
+
 const isAnalyzeShortcutTarget = (target) =>
   target === elements.task || target === elements.context;
 
 const init = () => {
+  elements.navButtons?.forEach((button) => {
+    button.addEventListener("click", () => {
+      const route = button.dataset.route || "/";
+      navigateTo(route);
+    });
+  });
+
+  window.addEventListener("popstate", () => {
+    setActiveRoute(normalizeRoute(window.location.pathname));
+  });
+
   elements.analyze.addEventListener("click", analyzeTask);
 
   document.addEventListener("keydown", (event) => {
@@ -776,6 +1340,8 @@ const init = () => {
 
   restoreInputs();
   updateContextIndicator();
+  setActiveRoute(normalizeRoute(window.location.pathname));
+  initTests();
 };
 
 init();

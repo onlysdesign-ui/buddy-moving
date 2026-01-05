@@ -11,9 +11,13 @@
     <div class="app">
       <header class="topbar">
         <img class="logo" src="assets/logo.svg" alt="Buddy Moving logo" />
+        <nav class="topbar-nav" aria-label="Primary">
+          <button class="nav-button is-active" type="button" data-route="/">Analyzer</button>
+          <button class="nav-button" type="button" data-route="/tests">Tests</button>
+        </nav>
       </header>
 
-      <section class="layout">
+      <section class="layout" id="analysis-page">
         <div class="left">
           <label class="field">
             <span>Task</span>
@@ -44,6 +48,21 @@
         <div class="right">
           <div class="results-list" id="results-list"></div>
         </div>
+      </section>
+
+      <section class="tests-page" id="tests-page" hidden>
+        <div class="tests-header">
+          <div>
+            <h1>Regression tests</h1>
+            <p class="tests-subtitle">Run the latest regression suite and review historical runs.</p>
+          </div>
+          <div class="tests-actions">
+            <button id="tests-run" class="primary">Прогнать тесты</button>
+            <button id="tests-cancel" class="secondary" hidden>Cancel</button>
+            <div class="tests-status" id="tests-status"></div>
+          </div>
+        </div>
+        <div class="tests-history" id="tests-history"></div>
       </section>
     </div>
 
