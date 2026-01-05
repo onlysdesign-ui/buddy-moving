@@ -1,19 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TestCase, TestCaseResult, TestData, TestRun } from "../tests/types";
 import { DEFAULT_TEST_KEYS } from "../tests/types";
+import { getApiBase } from "../config/apiBase";
 import { loadTestCases, flattenTestCases } from "../tests/testCases";
 import { runTests } from "../tests/runTests";
 import { addRun, loadRuns, saveRuns } from "../tests/storage";
-
-const PRODUCTION_BACKEND = "https://buddy-moving.onrender.com";
-
-const getBackendBase = () => {
-  const envBase = import.meta.env.VITE_API_BASE as string | undefined;
-  if (envBase && envBase.trim()) {
-    return envBase;
-  }
-  return import.meta.env.PROD ? PRODUCTION_BACKEND : "http://localhost:3000";
-};
 
 const formatDateTime = (value: string) => {
   const date = new Date(value);
@@ -131,7 +122,7 @@ export const TestsPage = () => {
 
     const controller = new AbortController();
     controllerRef.current = controller;
-    const backendBase = getBackendBase();
+    const backendBase = getApiBase();
 
     try {
       const { results, executedCases, cancelled } = await runTests({

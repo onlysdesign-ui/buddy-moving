@@ -11,6 +11,188 @@
           "task": "Design a checklist for renters planning a move.",
           "scale": "small",
           "tags": ["checklist", "renters", "planning"]
+        },
+        {
+          "id": "timeline-steps",
+          "title": "Timeline sequencing",
+          "task": "Outline a 30-day timeline for a small apartment move.",
+          "scale": "medium",
+          "tags": ["timeline", "planning", "apartment"]
+        },
+        {
+          "id": "budget-basics",
+          "title": "Budget framing",
+          "task": "Suggest a simple moving budget framework for first-time renters.",
+          "scale": "small",
+          "tags": ["budget", "first-time", "renters"]
+        }
+      ]
+    },
+    {
+      "id": "inventory",
+      "title": "Inventory and packing",
+      "context": "Focus on inventory management and packing for a two-bedroom apartment.",
+      "cases": [
+        {
+          "id": "room-inventory",
+          "title": "Room-by-room inventory",
+          "task": "Create an inventory plan for a two-bedroom apartment move.",
+          "scale": "medium",
+          "tags": ["inventory", "packing", "rooms"]
+        },
+        {
+          "id": "labeling-system",
+          "title": "Labeling system",
+          "task": "Propose a labeling system to reduce unpacking time.",
+          "scale": "small",
+          "tags": ["labels", "unpacking", "organization"]
+        },
+        {
+          "id": "fragile-items",
+          "title": "Fragile handling",
+          "task": "Recommend packing steps for fragile kitchen items.",
+          "scale": "small",
+          "tags": ["fragile", "kitchen", "packing"]
+        }
+      ]
+    },
+    {
+      "id": "logistics",
+      "title": "Move-day logistics",
+      "context": "Plan logistics for move day including transport and timing.",
+      "cases": [
+        {
+          "id": "truck-sizing",
+          "title": "Truck sizing",
+          "task": "Estimate truck size for a 1-bedroom apartment move.",
+          "scale": "small",
+          "tags": ["truck", "logistics", "sizing"]
+        },
+        {
+          "id": "elevator-booking",
+          "title": "Elevator booking",
+          "task": "Outline steps to reserve a building elevator for move day.",
+          "scale": "small",
+          "tags": ["building", "elevator", "logistics"]
+        },
+        {
+          "id": "parking-permits",
+          "title": "Parking permits",
+          "task": "Advise on securing loading zone permits for a city move.",
+          "scale": "medium",
+          "tags": ["permits", "city", "parking"]
+        }
+      ]
+    },
+    {
+      "id": "helpers",
+      "title": "Helpers and services",
+      "context": "Coordinate helpers and service providers for a move.",
+      "cases": [
+        {
+          "id": "hiring-movers",
+          "title": "Hiring movers",
+          "task": "Compare options for hiring movers vs. DIY for a local move.",
+          "scale": "medium",
+          "tags": ["movers", "services", "comparison"]
+        },
+        {
+          "id": "friend-crew",
+          "title": "Friend crew",
+          "task": "Plan how to coordinate friends helping with a move.",
+          "scale": "small",
+          "tags": ["friends", "coordination", "schedule"]
+        },
+        {
+          "id": "packing-service",
+          "title": "Packing service",
+          "task": "Evaluate whether to use a packing service for a 3-bedroom move.",
+          "scale": "large",
+          "tags": ["packing", "service", "decision"]
+        }
+      ]
+    },
+    {
+      "id": "utilities",
+      "title": "Utilities and address updates",
+      "context": "Manage utilities, address changes, and notifications.",
+      "cases": [
+        {
+          "id": "utility-transfer",
+          "title": "Utility transfer",
+          "task": "Provide a checklist for transferring utilities to a new address.",
+          "scale": "small",
+          "tags": ["utilities", "checklist", "transfer"]
+        },
+        {
+          "id": "address-change",
+          "title": "Address change",
+          "task": "Outline key places to update address after moving.",
+          "scale": "small",
+          "tags": ["address", "notifications", "admin"]
+        },
+        {
+          "id": "internet-setup",
+          "title": "Internet setup",
+          "task": "Plan steps to ensure internet is active on move-in day.",
+          "scale": "medium",
+          "tags": ["internet", "setup", "timeline"]
+        }
+      ]
+    },
+    {
+      "id": "risk",
+      "title": "Risk mitigation",
+      "context": "Identify risks and contingency planning for a move.",
+      "cases": [
+        {
+          "id": "weather-plan",
+          "title": "Weather contingency",
+          "task": "Create a backup plan for a rainy move day.",
+          "scale": "small",
+          "tags": ["weather", "contingency", "risk"]
+        },
+        {
+          "id": "damage-prevention",
+          "title": "Damage prevention",
+          "task": "List steps to reduce damage to furniture during transit.",
+          "scale": "small",
+          "tags": ["damage", "furniture", "prevention"]
+        },
+        {
+          "id": "schedule-buffer",
+          "title": "Schedule buffer",
+          "task": "Suggest buffer time to avoid delays during move day.",
+          "scale": "medium",
+          "tags": ["schedule", "buffer", "timing"]
+        }
+      ]
+    },
+    {
+      "id": "post-move",
+      "title": "Post-move setup",
+      "context": "Help users settle in after the move is complete.",
+      "cases": [
+        {
+          "id": "unpacking-priorities",
+          "title": "Unpacking priorities",
+          "task": "Recommend an unpacking order for the first 48 hours.",
+          "scale": "small",
+          "tags": ["unpacking", "priorities", "setup"]
+        },
+        {
+          "id": "room-setup",
+          "title": "Room setup",
+          "task": "Plan a quick setup for essential rooms after moving in.",
+          "scale": "medium",
+          "tags": ["setup", "rooms", "essentials"]
+        },
+        {
+          "id": "follow-up",
+          "title": "Follow-up tasks",
+          "task": "List follow-up tasks to complete within the first week.",
+          "scale": "small",
+          "tags": ["follow-up", "tasks", "week-one"]
         }
       ]
     }
