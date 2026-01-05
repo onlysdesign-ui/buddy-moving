@@ -1,0 +1,18 @@
+{
+  "contexts": [
+    {
+      "id": "move-planning",
+      "title": "Move planning basics",
+      "context": "You are helping renters plan an upcoming move. Provide concise, structured guidance.",
+      "cases": [
+        {
+          "id": "checklist-basics",
+          "title": "Checklist clarity",
+          "task": "Design a checklist for renters planning a move.",
+          "scale": "small",
+          "tags": ["checklist", "renters", "planning"]
+        }
+      ]
+    }
+  ]
+}
