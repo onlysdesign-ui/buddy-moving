@@ -60,11 +60,14 @@ export const TestsPage = () => {
   const [cases, setCases] = useState<TestCase[]>([]);
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [expandedRunId, setExpandedRunId] = useState<string | null>(null);
+  const [expandedCases, setExpandedCases] = useState<Record<string, boolean>>({});
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
   const [error, setError] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<Record<string, boolean>>({});
   const controllerRef = useRef<AbortController | null>(null);
+  const activeRunIdRef = useRef<string | null>(null);
+  const cancelRequestedRef = useRef(false);
 
   useEffect(() => {
     const storedRuns = loadRuns().sort(
@@ -118,6 +121,8 @@ export const TestsPage = () => {
     setIsRunning(true);
     setProgress({ completed: 0, total: totalCases });
     setExpandedRunId(runId);
+    activeRunIdRef.current = runId;
+    cancelRequestedRef.current = false;
     setRuns((prev) => addRun(prev, run));
 
     const controller = new AbortController();
@@ -149,7 +154,7 @@ export const TestsPage = () => {
             };
             return {
               ...next,
-              status: computeStatus(next, false),
+              status: computeStatus(next, cancelRequestedRef.current),
             };
           });
           setProgress({ completed, total: totalCases });
@@ -166,26 +171,50 @@ export const TestsPage = () => {
           failed,
           executedCases: executed,
         };
-        return {
+        const next = {
           ...current,
           results,
           summary,
-          status: computeStatus({ ...current, summary }, cancelled),
+        };
+        return {
+          ...next,
+          status: computeStatus(next, cancelled || cancelRequestedRef.current),
         };
       });
     } finally {
       setIsRunning(false);
       controllerRef.current = null;
+      activeRunIdRef.current = null;
       setProgress({ completed: 0, total: 0 });
     }
   };
 
   const handleCancel = () => {
+    cancelRequestedRef.current = true;
     controllerRef.current?.abort();
+    const runId = activeRunIdRef.current;
+    if (!runId) return;
+    updateRun(runId, (current) => {
+      const next = {
+        ...current,
+        summary: {
+          ...current.summary,
+          executedCases: progress.completed,
+        },
+      };
+      return {
+        ...next,
+        status: computeStatus(next, true),
+      };
+    });
   };
 
   const toggleRun = (runId: string) => {
     setExpandedRunId((prev) => (prev === runId ? null : runId));
+  };
+
+  const toggleCase = (caseId: string) => {
+    setExpandedCases((prev) => ({ ...prev, [caseId]: !prev[caseId] }));
   };
 
   const toggleKey = (key: string) => {
@@ -225,8 +254,12 @@ export const TestsPage = () => {
         {runs.map((run) => {
           const isExpanded = expandedRunId === run.id;
           return (
-            <details key={run.id} open={isExpanded}>
-              <summary onClick={() => toggleRun(run.id)}>
+            <div key={run.id} className="tests-run">
+              <button
+                type="button"
+                className="tests-run-header"
+                onClick={() => toggleRun(run.id)}
+              >
                 <div>
                   <strong>{formatDateTime(run.createdAt)}</strong>
                 </div>
@@ -236,8 +269,9 @@ export const TestsPage = () => {
                     {run.summary.succeeded} passed / {run.summary.failed} failed
                   </span>
                 </div>
-              </summary>
-              <div>
+              </button>
+              {isExpanded && (
+                <div>
                 {contexts.map((context) => {
                   const caseResults = context.cases
                     .map((caseItem) => {
@@ -255,62 +289,77 @@ export const TestsPage = () => {
 
                   return (
                     <div key={context.id} className="context-block">
-                      <h3>{context.title}</h3>
+                      <div className="context-header">
+                        <h3>{context.title}</h3>
+                      </div>
                       <p>{context.context}</p>
-                      <div>
+                      <div className="case-list">
                         {caseResults.map(({ result, caseItem }) => {
                           const duration = formatDuration(
                             result.startedAt,
                             result.finishedAt,
                           );
                           const tagInfo = formatTags(caseItem.tags || []);
+                          const isCaseExpanded = expandedCases[caseItem.id];
                           return (
-                            <details key={caseItem.id}>
-                              <summary>
-                                <span>{caseItem.scale}</span>
-                                <span>{caseItem.title}</span>
-                                <span>{result.ok ? "OK" : "Fail"}</span>
-                                <span>
+                            <div key={caseItem.id} className="case-card">
+                              <div className="case-row">
+                                <span className="case-scale">{caseItem.scale}</span>
+                                <span className="case-title">{caseItem.title}</span>
+                                <span className={result.ok ? "case-ok" : "case-fail"}>
+                                  {result.ok ? "OK" : "Fail"}
+                                </span>
+                                <span className="case-tags">
                                   {tagInfo.tags.join(", ")}
                                   {tagInfo.extra ? ` ${tagInfo.extra}` : ""}
                                 </span>
-                                <span>{duration}</span>
-                              </summary>
-                              <div>
-                                {result.error && <p>{result.error}</p>}
-                                {getCaseAnalysisKeys(result).map((key) => {
-                                  const entry = result.analysis?.[key];
-                                  const summary = entry?.summary ?? "";
-                                  const value = entry?.value ?? "";
-                                  const toggleId = `${run.id}-${caseItem.id}-${key}`;
-                                  const showFull = expandedKeys[toggleId];
-                                  return (
-                                    <div key={key} className="case-key">
-                                      <div>
-                                        <strong>{key}</strong>
-                                        <button
-                                          type="button"
-                                          onClick={() => toggleKey(toggleId)}
-                                        >
-                                          {showFull ? "Hide full" : "Show full"}
-                                        </button>
-                                      </div>
-                                      <pre>
-                                        {showFull ? value || summary : summary || value}
-                                      </pre>
-                                    </div>
-                                  );
-                                })}
+                                <span className="case-duration">{duration}</span>
+                                <button
+                                  type="button"
+                                  className="case-toggle"
+                                  onClick={() => toggleCase(caseItem.id)}
+                                >
+                                  {isCaseExpanded ? "Hide" : "Details"}
+                                </button>
                               </div>
-                            </details>
+                              {isCaseExpanded && (
+                                <div className="case-details">
+                                  {result.error && <p>{result.error}</p>}
+                                  {getCaseAnalysisKeys(result).map((key) => {
+                                    const entry = result.analysis?.[key];
+                                    const summary = entry?.summary ?? "";
+                                    const value = entry?.value ?? "";
+                                    const toggleId = `${run.id}-${caseItem.id}-${key}`;
+                                    const showFull = expandedKeys[toggleId];
+                                    return (
+                                      <div key={key} className="case-key">
+                                        <div className="case-key-header">
+                                          <strong>{key}</strong>
+                                          <button
+                                            type="button"
+                                            onClick={() => toggleKey(toggleId)}
+                                          >
+                                            {showFull ? "Hide full" : "Show full"}
+                                          </button>
+                                        </div>
+                                        <pre>
+                                          {showFull ? value || summary : summary || value}
+                                        </pre>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
                     </div>
                   );
                 })}
-              </div>
-            </details>
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

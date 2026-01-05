@@ -1,198 +1,198 @@
 {
   "contexts": [
     {
-      "id": "move-planning",
-      "title": "Move planning basics",
-      "context": "You are helping renters plan an upcoming move. Provide concise, structured guidance.",
+      "id": "sso",
+      "title": "SSO onboarding",
+      "context": "Enterprise SaaS product adding SSO/SAML onboarding for IT admins and end users.",
       "cases": [
         {
-          "id": "checklist-basics",
-          "title": "Checklist clarity",
-          "task": "Design a checklist for renters planning a move.",
-          "scale": "small",
-          "tags": ["checklist", "renters", "planning"]
-        },
-        {
-          "id": "timeline-steps",
-          "title": "Timeline sequencing",
-          "task": "Outline a 30-day timeline for a small apartment move.",
+          "id": "sso-admin-setup",
+          "title": "Admin setup flow",
+          "task": "Design an admin setup flow for SAML SSO that minimizes time-to-first-login.",
           "scale": "medium",
-          "tags": ["timeline", "planning", "apartment"]
+          "tags": ["sso", "saml", "onboarding"]
         },
         {
-          "id": "budget-basics",
-          "title": "Budget framing",
-          "task": "Suggest a simple moving budget framework for first-time renters.",
+          "id": "sso-error-recovery",
+          "title": "Error recovery",
+          "task": "Outline UX patterns to recover from SSO misconfiguration errors.",
           "scale": "small",
-          "tags": ["budget", "first-time", "renters"]
-        }
-      ]
-    },
-    {
-      "id": "inventory",
-      "title": "Inventory and packing",
-      "context": "Focus on inventory management and packing for a two-bedroom apartment.",
-      "cases": [
-        {
-          "id": "room-inventory",
-          "title": "Room-by-room inventory",
-          "task": "Create an inventory plan for a two-bedroom apartment move.",
-          "scale": "medium",
-          "tags": ["inventory", "packing", "rooms"]
+          "tags": ["sso", "errors", "recovery"]
         },
         {
-          "id": "labeling-system",
-          "title": "Labeling system",
-          "task": "Propose a labeling system to reduce unpacking time.",
-          "scale": "small",
-          "tags": ["labels", "unpacking", "organization"]
-        },
-        {
-          "id": "fragile-items",
-          "title": "Fragile handling",
-          "task": "Recommend packing steps for fragile kitchen items.",
-          "scale": "small",
-          "tags": ["fragile", "kitchen", "packing"]
-        }
-      ]
-    },
-    {
-      "id": "logistics",
-      "title": "Move-day logistics",
-      "context": "Plan logistics for move day including transport and timing.",
-      "cases": [
-        {
-          "id": "truck-sizing",
-          "title": "Truck sizing",
-          "task": "Estimate truck size for a 1-bedroom apartment move.",
-          "scale": "small",
-          "tags": ["truck", "logistics", "sizing"]
-        },
-        {
-          "id": "elevator-booking",
-          "title": "Elevator booking",
-          "task": "Outline steps to reserve a building elevator for move day.",
-          "scale": "small",
-          "tags": ["building", "elevator", "logistics"]
-        },
-        {
-          "id": "parking-permits",
-          "title": "Parking permits",
-          "task": "Advise on securing loading zone permits for a city move.",
-          "scale": "medium",
-          "tags": ["permits", "city", "parking"]
-        }
-      ]
-    },
-    {
-      "id": "helpers",
-      "title": "Helpers and services",
-      "context": "Coordinate helpers and service providers for a move.",
-      "cases": [
-        {
-          "id": "hiring-movers",
-          "title": "Hiring movers",
-          "task": "Compare options for hiring movers vs. DIY for a local move.",
-          "scale": "medium",
-          "tags": ["movers", "services", "comparison"]
-        },
-        {
-          "id": "friend-crew",
-          "title": "Friend crew",
-          "task": "Plan how to coordinate friends helping with a move.",
-          "scale": "small",
-          "tags": ["friends", "coordination", "schedule"]
-        },
-        {
-          "id": "packing-service",
-          "title": "Packing service",
-          "task": "Evaluate whether to use a packing service for a 3-bedroom move.",
+          "id": "sso-rollout",
+          "title": "Rollout strategy",
+          "task": "Propose a rollout strategy for enabling SSO without disrupting existing users.",
           "scale": "large",
-          "tags": ["packing", "service", "decision"]
+          "tags": ["rollout", "enterprise", "security"]
         }
       ]
     },
     {
-      "id": "utilities",
-      "title": "Utilities and address updates",
-      "context": "Manage utilities, address changes, and notifications.",
+      "id": "fintech",
+      "title": "Fintech payments",
+      "context": "Consumer fintech app improving payment reliability and trust.",
       "cases": [
         {
-          "id": "utility-transfer",
-          "title": "Utility transfer",
-          "task": "Provide a checklist for transferring utilities to a new address.",
-          "scale": "small",
-          "tags": ["utilities", "checklist", "transfer"]
-        },
-        {
-          "id": "address-change",
-          "title": "Address change",
-          "task": "Outline key places to update address after moving.",
-          "scale": "small",
-          "tags": ["address", "notifications", "admin"]
-        },
-        {
-          "id": "internet-setup",
-          "title": "Internet setup",
-          "task": "Plan steps to ensure internet is active on move-in day.",
+          "id": "fintech-disputes",
+          "title": "Dispute flow",
+          "task": "Design a dispute flow for card chargebacks with clear status updates.",
           "scale": "medium",
-          "tags": ["internet", "setup", "timeline"]
+          "tags": ["fintech", "disputes", "trust"]
+        },
+        {
+          "id": "fintech-fraud",
+          "title": "Fraud prevention",
+          "task": "Suggest onboarding questions to reduce fraud without harming conversion.",
+          "scale": "small",
+          "tags": ["fraud", "onboarding", "risk"]
+        },
+        {
+          "id": "fintech-payouts",
+          "title": "Payout timing",
+          "task": "Explain how to communicate payout timing delays to merchants.",
+          "scale": "small",
+          "tags": ["payouts", "communication", "merchants"]
         }
       ]
     },
     {
-      "id": "risk",
-      "title": "Risk mitigation",
-      "context": "Identify risks and contingency planning for a move.",
+      "id": "marketplace",
+      "title": "Marketplace growth",
+      "context": "Two-sided marketplace improving supply activation and demand matching.",
       "cases": [
         {
-          "id": "weather-plan",
-          "title": "Weather contingency",
-          "task": "Create a backup plan for a rainy move day.",
-          "scale": "small",
-          "tags": ["weather", "contingency", "risk"]
-        },
-        {
-          "id": "damage-prevention",
-          "title": "Damage prevention",
-          "task": "List steps to reduce damage to furniture during transit.",
-          "scale": "small",
-          "tags": ["damage", "furniture", "prevention"]
-        },
-        {
-          "id": "schedule-buffer",
-          "title": "Schedule buffer",
-          "task": "Suggest buffer time to avoid delays during move day.",
+          "id": "marketplace-supply",
+          "title": "Supply activation",
+          "task": "Create an activation plan for new sellers to list inventory quickly.",
           "scale": "medium",
-          "tags": ["schedule", "buffer", "timing"]
+          "tags": ["marketplace", "supply", "activation"]
+        },
+        {
+          "id": "marketplace-trust",
+          "title": "Trust signals",
+          "task": "Recommend trust signals to increase buyer confidence on listings.",
+          "scale": "small",
+          "tags": ["trust", "buyers", "listings"]
+        },
+        {
+          "id": "marketplace-pricing",
+          "title": "Pricing guidance",
+          "task": "Design pricing guidance for sellers to improve booking rates.",
+          "scale": "medium",
+          "tags": ["pricing", "sellers", "conversion"]
         }
       ]
     },
     {
-      "id": "post-move",
-      "title": "Post-move setup",
-      "context": "Help users settle in after the move is complete.",
+      "id": "brand-site",
+      "title": "Brand marketing site",
+      "context": "Consumer brand website redesign to improve conversion from traffic.",
       "cases": [
         {
-          "id": "unpacking-priorities",
-          "title": "Unpacking priorities",
-          "task": "Recommend an unpacking order for the first 48 hours.",
+          "id": "brand-hero",
+          "title": "Hero messaging",
+          "task": "Define a hero section narrative that improves trial signups.",
           "scale": "small",
-          "tags": ["unpacking", "priorities", "setup"]
+          "tags": ["marketing", "messaging", "conversion"]
         },
         {
-          "id": "room-setup",
-          "title": "Room setup",
-          "task": "Plan a quick setup for essential rooms after moving in.",
+          "id": "brand-proof",
+          "title": "Social proof",
+          "task": "Outline how to structure social proof to reduce bounce rate.",
+          "scale": "small",
+          "tags": ["social-proof", "trust", "bounce"]
+        },
+        {
+          "id": "brand-pricing",
+          "title": "Pricing page",
+          "task": "Propose a pricing page layout for a 3-tier subscription.",
           "scale": "medium",
-          "tags": ["setup", "rooms", "essentials"]
+          "tags": ["pricing", "subscriptions", "layout"]
+        }
+      ]
+    },
+    {
+      "id": "api-platform",
+      "title": "Developer platform",
+      "context": "API platform improving developer onboarding and documentation.",
+      "cases": [
+        {
+          "id": "api-quickstart",
+          "title": "Quickstart",
+          "task": "Design a 5-minute quickstart for the API with sample requests.",
+          "scale": "small",
+          "tags": ["api", "docs", "quickstart"]
         },
         {
-          "id": "follow-up",
-          "title": "Follow-up tasks",
-          "task": "List follow-up tasks to complete within the first week.",
+          "id": "api-keys",
+          "title": "API keys",
+          "task": "Outline a secure API key management UX for teams.",
+          "scale": "medium",
+          "tags": ["security", "keys", "teams"]
+        },
+        {
+          "id": "api-rate-limits",
+          "title": "Rate limit messaging",
+          "task": "Explain how to message rate limits and retries to developers.",
           "scale": "small",
-          "tags": ["follow-up", "tasks", "week-one"]
+          "tags": ["rate-limits", "developers", "errors"]
+        }
+      ]
+    },
+    {
+      "id": "internal-tools",
+      "title": "Internal tooling",
+      "context": "Operations team dashboard for managing support queues.",
+      "cases": [
+        {
+          "id": "ops-triage",
+          "title": "Queue triage",
+          "task": "Design a triage workflow for prioritizing support tickets.",
+          "scale": "medium",
+          "tags": ["ops", "support", "workflow"]
+        },
+        {
+          "id": "ops-sla",
+          "title": "SLA tracking",
+          "task": "Propose an SLA tracking view for support managers.",
+          "scale": "small",
+          "tags": ["sla", "metrics", "managers"]
+        },
+        {
+          "id": "ops-automation",
+          "title": "Automation ideas",
+          "task": "Suggest automation opportunities to reduce manual ticket handling.",
+          "scale": "small",
+          "tags": ["automation", "efficiency", "ops"]
+        }
+      ]
+    },
+    {
+      "id": "education",
+      "title": "Learning platform",
+      "context": "Online learning platform improving course completion.",
+      "cases": [
+        {
+          "id": "edu-onboarding",
+          "title": "Learner onboarding",
+          "task": "Design a learner onboarding checklist to improve course starts.",
+          "scale": "small",
+          "tags": ["education", "onboarding", "retention"]
+        },
+        {
+          "id": "edu-progress",
+          "title": "Progress nudges",
+          "task": "Outline progress nudges to help learners finish modules.",
+          "scale": "medium",
+          "tags": ["nudges", "progress", "completion"]
+        },
+        {
+          "id": "edu-community",
+          "title": "Community engagement",
+          "task": "Suggest features to increase peer interaction in courses.",
+          "scale": "large",
+          "tags": ["community", "engagement", "social"]
         }
       ]
     }
