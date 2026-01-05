@@ -1,0 +1,319 @@
+{
+  "meta": {
+    "version": "2.0.0",
+    "createdAt": "2026-01-05",
+    "totalContexts": 7,
+    "casesPerContext": 3,
+    "totalCases": 21,
+    "schemaNotes": [
+      "tags are designed for dashboard grouping",
+      "each case includes multiple tag dimensions: domainTags, artifactTags, difficultyTags",
+      "cases intentionally vary: product, task type, constraints, data availability, maturity",
+      "some cases include a proposed solution to test anti-tunnel behavior"
+    ]
+  },
+  "contexts": [
+    {
+      "contextId": "CTX01_b2b_saas_security_sso",
+      "title": "B2B SaaS - Workspace collaboration tool (Security & Enterprise)",
+      "languageHint": "en",
+      "context": "Product: B2B collaboration SaaS (projects + docs + async updates).\nUsers: team admins, IT/security, end users.\nMission: align teams with minimal overhead.\nCore flows: sign up → create workspace → invite → projects/tasks → integrations.\nMonetization: per-seat subscription, enterprise tier.\nMarket: crowded.\nGrowth: PLG + enterprise expansion.\nConstraints: compliance + enterprise expectations; can’t break existing auth.\nAnalytics maturity: strong product analytics, weak security telemetry."
+    },
+    {
+      "contextId": "CTX02_consumer_ecommerce_checkout",
+      "title": "Consumer e-commerce - D2C skincare (Checkout & conversion)",
+      "languageHint": "ru",
+      "context": "Продукт: D2C e-commerce (косметика, подписка на регулярные покупки).\nПользователи: 18–45, mobile-first.\nМиссия: сделать уход проще + персональные наборы.\nФлоу: каталог → карточка → корзина → checkout → оплата → доставка → повтор.\nМонетизация: разовые покупки + подписка.\nРынок: конкурентный.\nОграничения: нельзя ухудшить SEO/скорость; платежи через PSP.\nАналитика: средняя, часть событий не размечена."
+    },
+    {
+      "contextId": "CTX03_fintech_kyc_risk",
+      "title": "Fintech - Personal finance & payments (KYC, risk, trust)",
+      "languageHint": "en",
+      "context": "Product: fintech app for payments + budgeting.\nUsers: 20–55.\nMission: safe and simple personal finance.\nFlows: sign up → KYC → add card/bank → send money → insights.\nMonetization: interchange + premium.\nConstraints: compliance-heavy (KYC/AML), must avoid dark patterns.\nAnalytics: strong funnels, strict privacy."
+    },
+    {
+      "contextId": "CTX04_marketplace_search_relevance",
+      "title": "Marketplace - Local services (Search & matching)",
+      "languageHint": "ru",
+      "context": "Продукт: маркетплейс локальных услуг (мастера/клининг/ремонт).\nПользователи: заказчики и исполнители.\nФлоу: поиск → фильтры → карточка → чат → бронирование → оплата → отзыв.\nМонетизация: комиссия + продвижение.\nОграничения: важно удержать supply, fairness в поиске.\nАналитика: хорошая по спросу, слабая по качеству выдачи."
+    },
+    {
+      "contextId": "CTX05_mobile_app_notifications_retention",
+      "title": "Mobile consumer app - Meditation & sleep (Notifications & retention)",
+      "languageHint": "ru",
+      "context": "Продукт: медитации и сон (аудио, дыхание, курсы).\nПользователи: 18–50.\nФлоу: install → onboarding → выбрать цель → первая сессия → streak → подписка.\nМонетизация: подписка.\nОграничения: нельзя раздражать пушами, privacy.\nАналитика: средняя, есть когорты."
+    },
+    {
+      "contextId": "CTX06_brand_website_rebuild",
+      "title": "Brand & Marketing - Company website redesign (SEO, performance, CMS)",
+      "languageHint": "ru",
+      "context": "Продукт: корпоративный сайт + блог + лендинги.\nПользователи: потенциальные клиенты, партнеры, кандидаты.\nЦели: бренд, доверие, лиды.\nФлоу: SEO → лендинг → кейсы → форма → CRM.\nОграничения: SEO нельзя сломать, нужен быстрый релиз, контент-редакторы.\nТехнологии: сейчас WordPress, рассматривают headless.\nАналитика: GA4, слабая атрибуция."
+    },
+    {
+      "contextId": "CTX07_platform_api_rate_limits",
+      "title": "Developer platform - Public API (Rate limits, reliability, docs)",
+      "languageHint": "en",
+      "context": "Product: developer platform with public REST API.\nUsers: developers integrating product.\nFlows: sign up → API key → make requests → webhooks → monitor.\nMonetization: usage-based pricing tiers.\nConstraints: uptime, backward compatibility, clear error semantics.\nAnalytics: strong infra metrics, weak developer UX feedback."
+    }
+  ],
+  "cases": [
+    {
+      "id": "CTX01_small_sso_scope",
+      "contextId": "CTX01_b2b_saas_security_sso",
+      "scale": "small",
+      "title": "Add SSO (SAML) to enterprise tier - scope definition",
+      "task": "We need to add SSO (SAML) for enterprise customers. Define a 2-week MVP scope that’s still enterprise-credible. Constraints: cannot break existing email/password login; must support just-in-time provisioning; keep admin setup simple.",
+      "tags": ["sso", "saml", "enterprise", "auth", "security", "scope"],
+      "domainTags": ["b2b", "saas", "enterprise"],
+      "artifactTags": ["framing", "unknowns", "work_package"],
+      "difficultyTags": ["cross-team", "security-sensitive", "unknown-requirements", "legacy-constraints"],
+      "evalHints": ["shouldIncludeConstraints", "shouldListUnknownsWithValidation", "shouldNotInventTimelinesBeyondGiven", "shouldProduceActionableWorkPackage"]
+    },
+    {
+      "id": "CTX01_medium_rbac_permissions",
+      "contextId": "CTX01_b2b_saas_security_sso",
+      "scale": "medium",
+      "title": "RBAC redesign - permission model simplification",
+      "task": "Admins report that permission settings are confusing and lead to support tickets. Current roles: Owner/Admin/Member/Guest, but permissions are inconsistent across projects and docs. Propose a redesign direction and validation plan without changing pricing. Constraints: migration must not lock users out.",
+      "tags": ["rbac", "permissions", "admin", "migration", "support", "ux"],
+      "domainTags": ["b2b", "saas", "enterprise"],
+      "artifactTags": ["solution_space", "decision", "experiment_plan"],
+      "difficultyTags": ["legacy-migration", "high-risk", "support-driven", "incomplete-data"],
+      "evalHints": ["shouldIncludeMigrationRisks", "shouldAvoidInventingMetrics", "shouldProvideAlternatives", "shouldIncludeInstrumentation"]
+    },
+    {
+      "id": "CTX01_large_security_audit",
+      "contextId": "CTX01_b2b_saas_security_sso",
+      "scale": "large",
+      "title": "Prepare for SOC2 - security UX + evidence plan",
+      "task": "We’re preparing for SOC2 in 8 weeks. Product changes must improve security posture and reduce audit risk. Identify key product areas to tackle (auth, access logs, session management, admin controls), propose a prioritized plan, and specify what evidence/telemetry we need to collect. Constraints: limited eng bandwidth, no full rewrite.",
+      "tags": ["soc2", "security", "audit", "telemetry", "logging", "prioritization"],
+      "domainTags": ["b2b", "saas", "compliance"],
+      "artifactTags": ["framing", "decision", "work_package", "backlog"],
+      "difficultyTags": ["compliance-heavy", "cross-team", "high-stakes"],
+      "evalHints": ["shouldBeRealistic", "shouldNotInventLegalClaims", "shouldProvideConcreteEvidencePlan", "shouldBeActionable"]
+    },
+
+    {
+      "id": "CTX02_small_checkout_copy",
+      "contextId": "CTX02_consumer_ecommerce_checkout",
+      "scale": "small",
+      "title": "Checkout microcopy cleanup",
+      "task": "В checkout пользователи путаются на шаге выбора доставки и оплаты. Нужно улучшить микрокопирайт и подсказки так, чтобы меньше людей бросали оформление. Без изменения структуры страницы.",
+      "tags": ["checkout", "copywriting", "ux", "conversion", "microcopy"],
+      "domainTags": ["b2c", "ecommerce"],
+      "artifactTags": ["work_package", "decision"],
+      "difficultyTags": ["limited-scope", "no-structure-change"],
+      "evalHints": ["shouldBeConcrete", "shouldNotInventMetrics", "shouldIncludeAcceptanceCriteria"]
+    },
+    {
+      "id": "CTX02_medium_payment_failures",
+      "contextId": "CTX02_consumer_ecommerce_checkout",
+      "scale": "medium",
+      "title": "Reduce payment failures",
+      "task": "Оплата падает на 9% транзакций (ошибки PSP, 3DS, таймауты). Нужно улучшить UX обработки ошибок: сообщения, retry, альтернативные методы оплаты. Ограничения: мы не контролируем PSP, нельзя менять провайдера сейчас.",
+      "tags": ["payments", "psp", "error-handling", "3ds", "retry", "reliability"],
+      "domainTags": ["b2c", "ecommerce"],
+      "artifactTags": ["framing", "solution_space", "experiment_plan"],
+      "difficultyTags": ["external-dependency", "technical-constraints"],
+      "evalHints": ["shouldIncludeInstrumentation", "shouldAddressEdgeCases", "shouldNotInventPSPCapabilities"]
+    },
+    {
+      "id": "CTX02_large_subscription_bundle",
+      "contextId": "CTX02_consumer_ecommerce_checkout",
+      "scale": "large",
+      "title": "Launch subscription bundle with minimal churn",
+      "task": "Мы хотим запустить подписку на регулярную доставку (каждые 30/60 дней) и увеличить LTV, но боимся оттока и негативных отзывов. Предложи стратегию (продукт + коммуникация), план тестов и метрики. Ограничение: нельзя обещать медицинский эффект, только косметический.",
+      "tags": ["subscription", "ltv", "churn", "bundle", "pricing-ux", "experiments"],
+      "domainTags": ["b2c", "ecommerce"],
+      "artifactTags": ["decision", "experiment_plan", "work_package"],
+      "difficultyTags": ["cross-functional", "brand-risk"],
+      "evalHints": ["shouldAvoidMedicalClaims", "shouldProvideTradeoffs", "shouldNotInventTargets"]
+    },
+
+    {
+      "id": "CTX03_small_kyc_dropoff",
+      "contextId": "CTX03_fintech_kyc_risk",
+      "scale": "small",
+      "title": "Reduce KYC drop-off without dark patterns",
+      "task": "KYC completion is low. We need to reduce drop-off while staying compliant and avoiding pressure tactics. Suggest UX and messaging changes and what we should measure.",
+      "tags": ["kyc", "compliance", "onboarding", "trust", "ux-writing"],
+      "domainTags": ["fintech", "b2c"],
+      "artifactTags": ["framing", "experiment_plan"],
+      "difficultyTags": ["compliance-heavy", "trust-sensitive"],
+      "evalHints": ["shouldRespectCompliance", "shouldNotInventLegalPolicy", "shouldIncludeInstrumentation"]
+    },
+    {
+      "id": "CTX03_medium_fraud_chargebacks",
+      "contextId": "CTX03_fintech_kyc_risk",
+      "scale": "medium",
+      "title": "Chargebacks spike - product + risk response",
+      "task": "Chargebacks increased 2x in 3 weeks. Risk team suggests adding more friction at checkout. Product worries about conversion. Propose a balanced plan: what to change, what to validate first, and how to monitor. Constraints: no new vendor in next month.",
+      "tags": ["fraud", "chargebacks", "risk", "checkout", "tradeoffs", "monitoring"],
+      "domainTags": ["fintech", "payments"],
+      "artifactTags": ["decision", "experiment_plan", "work_package"],
+      "difficultyTags": ["high-stakes", "cross-team", "conflicting-goals"],
+      "evalHints": ["shouldBalanceRiskAndConversion", "shouldProposeGuardrails", "shouldBeRealistic"]
+    },
+    {
+      "id": "CTX03_large_trust_transparency",
+      "contextId": "CTX03_fintech_kyc_risk",
+      "scale": "large",
+      "title": "Trust & transparency redesign",
+      "task": "Users don’t trust us with bank connections and permissions. Reviews mention: 'unclear what data you access' and 'scared of scams'. Design a trust-building strategy across onboarding, permissions, and settings. Must be compliant, measurable, and not just marketing copy.",
+      "tags": ["trust", "permissions", "transparency", "bank-connection", "settings", "reviews"],
+      "domainTags": ["fintech", "b2c"],
+      "artifactTags": ["solution_space", "decision", "work_package"],
+      "difficultyTags": ["trust-sensitive", "cross-surface", "privacy"],
+      "evalHints": ["shouldIncludeSpecificUXChanges", "shouldUseEvidenceFromTask", "shouldIncludeMeasurement"]
+    },
+
+    {
+      "id": "CTX04_small_filter_redesign",
+      "contextId": "CTX04_marketplace_search_relevance",
+      "scale": "small",
+      "title": "Filter UI cleanup (mobile)",
+      "task": "Фильтры в поиске перегружены и пользователи не понимают разницу между 'Срочно' и 'Быстро'. Нужно улучшить фильтры на мобильном: понятность, порядок, микрокопи. Без изменения алгоритма поиска.",
+      "tags": ["filters", "search", "mobile", "ux", "copywriting"],
+      "domainTags": ["marketplace", "b2c"],
+      "artifactTags": ["work_package"],
+      "difficultyTags": ["limited-scope"],
+      "evalHints": ["shouldBeConcrete", "shouldNotInventAlgorithmChanges", "shouldIncludeEdgeCases"]
+    },
+    {
+      "id": "CTX04_medium_relevance_metrics",
+      "contextId": "CTX04_marketplace_search_relevance",
+      "scale": "medium",
+      "title": "Improve search relevance + define evaluation",
+      "task": "Пользователи жалуются: 'показывает не то' и 'слишком далеко'. Нужно улучшить релевантность выдачи и придумать, как измерять качество поиска. Ограничения: нельзя ухудшить fairness для новых исполнителей.",
+      "tags": ["search", "relevance", "ranking", "metrics", "fairness"],
+      "domainTags": ["marketplace"],
+      "artifactTags": ["framing", "experiment_plan"],
+      "difficultyTags": ["algorithm-adjacent", "measurement-hard"],
+      "evalHints": ["shouldDefineMetricsWithoutInventingTargets", "shouldIncludeTradeoffs", "shouldIncludeInstrumentation"]
+    },
+    {
+      "id": "CTX04_large_matching_overhaul",
+      "contextId": "CTX04_marketplace_search_relevance",
+      "scale": "large",
+      "title": "Matching system redesign (supply/demand)",
+      "task": "В некоторых городах спрос высокий, но бронирований мало. Нужно переработать matching: как показываем исполнителей, как учитываем время ответа, качество, цену. При этом нельзя убить новых исполнителей и нельзя стимулировать спам-отклики. Сформулируй стратегию, неизвестные и план тестов.",
+      "tags": ["matching", "liquidity", "ranking", "supply", "anti-spam", "experiments"],
+      "domainTags": ["marketplace", "two-sided"],
+      "artifactTags": ["solution_space", "decision", "experiment_plan"],
+      "difficultyTags": ["two-sided", "high-risk", "cross-team"],
+      "evalHints": ["shouldAddressTwoSidedConstraints", "shouldIncludeGuardrails", "shouldBeActionable"]
+    },
+
+    {
+      "id": "CTX05_small_push_frequency",
+      "contextId": "CTX05_mobile_app_notifications_retention",
+      "scale": "small",
+      "title": "Fix notification fatigue",
+      "task": "Пользователи отключают пуши после 2–3 дней. Нужно пересобрать частоту и тональность пушей так, чтобы не раздражать и повысить возврат на следующую сессию.",
+      "tags": ["push", "notifications", "retention", "tone-of-voice"],
+      "domainTags": ["mobile", "b2c"],
+      "artifactTags": ["solution_space", "experiment_plan"],
+      "difficultyTags": ["behavioral", "limited-data"],
+      "evalHints": ["shouldProposeVariants", "shouldMeasureProperly", "shouldNotInventTargets"]
+    },
+    {
+      "id": "CTX05_medium_onboarding_personalization",
+      "contextId": "CTX05_mobile_app_notifications_retention",
+      "scale": "medium",
+      "title": "Onboarding personalization for better first session",
+      "task": "После онбординга многие не стартуют первую сессию. Команда предлагает добавить больше вопросов, чтобы лучше персонализировать. Но есть риск увеличить отток на онбординге. Выбери направление на 2 недели и предложи тесты.",
+      "tags": ["onboarding", "personalization", "activation", "tradeoffs", "ab-test"],
+      "domainTags": ["mobile", "subscription"],
+      "artifactTags": ["decision", "experiment_plan"],
+      "difficultyTags": ["anti-tunnel", "activation-focused"],
+      "evalHints": ["shouldAvoidOverfittingOnProposedSolution", "shouldIncludeAlternatives", "shouldIncludeGuardrails"]
+    },
+    {
+      "id": "CTX05_large_content_strategy",
+      "contextId": "CTX05_mobile_app_notifications_retention",
+      "scale": "large",
+      "title": "Content packaging strategy for conversion",
+      "task": "Пользователи любят бесплатные одиночные медитации, но не покупают подписку. Нужно упаковать контент (курсы, треки, прогресс) так, чтобы ценность подписки стала очевидной. Нельзя делать агрессивный paywall.",
+      "tags": ["content", "packaging", "subscription", "value-prop", "conversion"],
+      "domainTags": ["mobile", "b2c"],
+      "artifactTags": ["framing", "solution_space", "decision", "work_package"],
+      "difficultyTags": ["strategy-heavy", "behavioral"],
+      "evalHints": ["shouldProduceClearStrategy", "shouldNotInventPricing", "shouldIncludeMeasurement"]
+    },
+
+    {
+      "id": "CTX06_small_landing_speed",
+      "contextId": "CTX06_brand_website_rebuild",
+      "scale": "small",
+      "title": "Fix landing page speed (Core Web Vitals)",
+      "task": "Лендинг грузится медленно, падают лиды. Нужно улучшить Core Web Vitals (LCP/INP/CLS) без полного редизайна. Ограничение: нельзя убрать ключевые блоки маркетинга.",
+      "tags": ["website", "performance", "core-web-vitals", "seo", "landing"],
+      "domainTags": ["marketing", "web"],
+      "artifactTags": ["framing", "work_package"],
+      "difficultyTags": ["technical", "seo-sensitive"],
+      "evalHints": ["shouldIncludeConcreteSteps", "shouldMentionMeasurement", "shouldNotInventInfraDetails"]
+    },
+    {
+      "id": "CTX06_medium_rebrand_redesign",
+      "contextId": "CTX06_brand_website_rebuild",
+      "scale": "medium",
+      "title": "Rebrand website redesign (information architecture + system)",
+      "task": "Нужен редизайн брендового сайта: новая визуальная система, обновление структуры, единый стиль лендингов, и при этом нельзя потерять SEO. Предложи план работ, риски и артефакты (сетка, компоненты, контент-модель).",
+      "tags": ["rebrand", "website", "design-system", "ia", "seo", "cms"],
+      "domainTags": ["marketing", "web"],
+      "artifactTags": ["solution_space", "decision", "work_package", "backlog"],
+      "difficultyTags": ["cross-team", "seo-sensitive", "content-heavy"],
+      "evalHints": ["shouldIncludeSEOPlan", "shouldIncludeDesignSystemArtifacts", "shouldBeActionable"]
+    },
+    {
+      "id": "CTX06_large_cms_headless_migration",
+      "contextId": "CTX06_brand_website_rebuild",
+      "scale": "large",
+      "title": "Move from WordPress to headless CMS (migration strategy)",
+      "task": "Сейчас WordPress, хотим headless CMS (контент + лендинги). Нужно миграцию сделать поэтапно, не теряя SEO и не ломая работу редакторов. Предложи стратегию миграции, план экспериментов и критерии готовности.",
+      "tags": ["migration", "headless-cms", "wordpress", "seo", "content-model", "rollout"],
+      "domainTags": ["marketing", "web", "platform"],
+      "artifactTags": ["framing", "decision", "work_package", "backlog"],
+      "difficultyTags": ["legacy-migration", "high-risk", "seo-sensitive"],
+      "evalHints": ["shouldIncludePhasedRollout", "shouldIncludeRollbackPlan", "shouldNotInventTimelinesBeyondGiven"]
+    },
+
+    {
+      "id": "CTX07_small_rate_limit_errors",
+      "contextId": "CTX07_platform_api_rate_limits",
+      "scale": "small",
+      "title": "Improve API error messages for rate limits",
+      "task": "Developers complain that rate limit errors are confusing. Improve error response format, messaging, and docs guidance. Constraints: must keep backwards compatibility; no breaking changes.",
+      "tags": ["api", "rate-limits", "developer-experience", "docs", "errors"],
+      "domainTags": ["platform", "b2b"],
+      "artifactTags": ["work_package", "decision"],
+      "difficultyTags": ["backward-compatibility"],
+      "evalHints": ["shouldBeConcrete", "shouldRespectBackCompat", "shouldIncludeDocsChanges"]
+    },
+    {
+      "id": "CTX07_medium_usage_based_pricing_ux",
+      "contextId": "CTX07_platform_api_rate_limits",
+      "scale": "medium",
+      "title": "Usage-based pricing UX + transparency",
+      "task": "Users don’t understand API usage charges. Support tickets mention 'surprise bills'. Propose a product + UX strategy for pricing transparency (dashboards, alerts, limits), and an experiment plan. Constraints: cannot change pricing model.",
+      "tags": ["pricing-ux", "transparency", "billing", "alerts", "support"],
+      "domainTags": ["platform", "saas"],
+      "artifactTags": ["solution_space", "decision", "experiment_plan"],
+      "difficultyTags": ["high-trust", "cross-surface"],
+      "evalHints": ["shouldAvoidChangingPricing", "shouldIncludeGuardrails", "shouldBeActionable"]
+    },
+    {
+      "id": "CTX07_large_api_reliability",
+      "contextId": "CTX07_platform_api_rate_limits",
+      "scale": "large",
+      "title": "Reliability improvements + developer trust",
+      "task": "API reliability issues cause churn in top accounts. We need a plan that includes product comms (status page, incident transparency), technical prioritization (timeouts, retries, idempotency), and developer tooling. Provide a structured strategy, unknowns, and success measurement (qualitative if needed).",
+      "tags": ["reliability", "platform", "incident-response", "status-page", "tooling"],
+      "domainTags": ["platform", "enterprise"],
+      "artifactTags": ["framing", "decision", "work_package", "backlog"],
+      "difficultyTags": ["high-stakes", "cross-team", "technical"],
+      "evalHints": ["shouldIncludeCommsAndTech", "shouldNotInventSLOsUnlessGiven", "shouldIncludeInstrumentation"]
+    }
+  ]
+}
