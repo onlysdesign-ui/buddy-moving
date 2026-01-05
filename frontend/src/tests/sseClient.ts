@@ -1,7 +1,18 @@
-const parseSseEvent = (rawEvent) => {
+type StreamOptions = {
+  url: string;
+  payload: unknown;
+  signal?: AbortSignal;
+  onEvent?: (event: string, data: string) => void;
+};
+
+type StreamResult = {
+  sawDone: boolean;
+};
+
+const parseSseEvent = (rawEvent: string): { event: string; data: string } => {
   const lines = rawEvent.split("\n");
   let event = "message";
-  const dataLines = [];
+  const dataLines: string[] = [];
 
   for (const line of lines) {
     if (!line || line.startsWith(":")) continue;
@@ -17,7 +28,12 @@ const parseSseEvent = (rawEvent) => {
   return { event, data: dataLines.join("\n") };
 };
 
-export const streamSse = async ({ url, payload, signal, onEvent }) => {
+export const streamSse = async ({
+  url,
+  payload,
+  signal,
+  onEvent,
+}: StreamOptions): Promise<StreamResult> => {
   const response = await fetch(url, {
     method: "POST",
     headers: {
@@ -50,13 +66,13 @@ export const streamSse = async ({ url, payload, signal, onEvent }) => {
     const events = buffer.split("\n\n");
     buffer = events.pop() || "";
 
-    events.forEach((rawEvent) => {
+    for (const rawEvent of events) {
       const { event, data } = parseSseEvent(rawEvent);
       if (event === "done") {
         sawDone = true;
       }
       onEvent?.(event, data);
-    });
+    }
   }
 
   if (buffer.trim()) {

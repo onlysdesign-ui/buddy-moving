@@ -1,0 +1,200 @@
+{
+  "contexts": [
+    {
+      "id": "sso-rollout",
+      "title": "Enterprise SSO rollout",
+      "context": "A mid-size enterprise is standardizing authentication across 40 internal apps. They need SSO, MFA, and a migration plan that minimizes downtime for different departments and partner teams.",
+      "cases": [
+        {
+          "id": "sso-1",
+          "title": "Staged SSO migration plan",
+          "task": "Design a phased rollout plan for enabling SSO across all internal apps while keeping legacy logins operational during transition.",
+          "scale": "large",
+          "tags": ["security", "migration", "enterprise"]
+        },
+        {
+          "id": "sso-2",
+          "title": "MFA adoption metrics",
+          "task": "Propose success metrics and monitoring for MFA adoption across multiple departments with different risk profiles.",
+          "scale": "medium",
+          "tags": ["metrics", "security", "risk"]
+        },
+        {
+          "id": "sso-3",
+          "title": "Partner access strategy",
+          "task": "Outline an access strategy for external partners who need limited app access without full employee accounts.",
+          "scale": "medium",
+          "tags": ["access", "partners", "permissions"]
+        }
+      ]
+    },
+    {
+      "id": "fintech-budgeting",
+      "title": "Fintech budgeting assistant",
+      "context": "A consumer fintech app wants to launch an AI budgeting assistant that reviews transactions, suggests goals, and nudges users to save without overstepping privacy expectations.",
+      "cases": [
+        {
+          "id": "fin-1",
+          "title": "Trust-building onboarding",
+          "task": "Design the onboarding flow to explain how the budgeting assistant uses data and gains user trust.",
+          "scale": "small",
+          "tags": ["onboarding", "trust", "fintech"]
+        },
+        {
+          "id": "fin-2",
+          "title": "Nudge strategy",
+          "task": "Create a nudge strategy for users who overspend in key categories without causing alert fatigue.",
+          "scale": "medium",
+          "tags": ["nudges", "behavior", "retention"]
+        },
+        {
+          "id": "fin-3",
+          "title": "Goal personalization",
+          "task": "Define how the assistant should personalize savings goals based on income volatility and irregular expenses.",
+          "scale": "large",
+          "tags": ["personalization", "data", "planning"]
+        }
+      ]
+    },
+    {
+      "id": "marketplace-returns",
+      "title": "Marketplace returns optimization",
+      "context": "A marketplace is struggling with high return rates and slow refunds. They want to improve the returns experience while reducing operational costs.",
+      "cases": [
+        {
+          "id": "market-1",
+          "title": "Self-serve return labels",
+          "task": "Improve the self-serve return label flow so customers can complete it in under two minutes.",
+          "scale": "small",
+          "tags": ["returns", "ux", "speed"]
+        },
+        {
+          "id": "market-2",
+          "title": "Refund timing transparency",
+          "task": "Design a status and notification system that makes refund timelines clear and reduces support tickets.",
+          "scale": "medium",
+          "tags": ["notifications", "support", "trust"]
+        },
+        {
+          "id": "market-3",
+          "title": "Seller incentives",
+          "task": "Create an incentive program for sellers to reduce return rates without penalizing customer satisfaction.",
+          "scale": "large",
+          "tags": ["marketplace", "policy", "incentives"]
+        }
+      ]
+    },
+    {
+      "id": "brand-site",
+      "title": "Brand marketing site refresh",
+      "context": "A consumer electronics brand wants to refresh its marketing site to better showcase new products, capture leads, and boost newsletter signups.",
+      "cases": [
+        {
+          "id": "brand-1",
+          "title": "Homepage hero strategy",
+          "task": "Define a homepage hero strategy that balances product storytelling with lead capture.",
+          "scale": "small",
+          "tags": ["marketing", "content", "lead-gen"]
+        },
+        {
+          "id": "brand-2",
+          "title": "Product comparison",
+          "task": "Design a product comparison experience for three new devices with overlapping features.",
+          "scale": "medium",
+          "tags": ["comparison", "conversion", "information"]
+        },
+        {
+          "id": "brand-3",
+          "title": "Newsletter incentives",
+          "task": "Create a newsletter incentive plan that grows signups without discounting premium positioning.",
+          "scale": "medium",
+          "tags": ["email", "growth", "brand"]
+        }
+      ]
+    },
+    {
+      "id": "api-platform",
+      "title": "Public API platform",
+      "context": "A developer platform is launching a public API for analytics. They need onboarding docs, rate limits, and monitoring to support third-party integrations.",
+      "cases": [
+        {
+          "id": "api-1",
+          "title": "API onboarding flow",
+          "task": "Outline the onboarding flow for developers to generate keys, read docs, and make their first successful request.",
+          "scale": "small",
+          "tags": ["api", "developer", "docs"]
+        },
+        {
+          "id": "api-2",
+          "title": "Rate limit policy",
+          "task": "Design a rate-limit policy and UX that balances free-tier access with abuse prevention.",
+          "scale": "large",
+          "tags": ["rate-limit", "policy", "growth"]
+        },
+        {
+          "id": "api-3",
+          "title": "Incident communications",
+          "task": "Create an incident communication plan for API outages that keeps developers informed without overwhelming them.",
+          "scale": "medium",
+          "tags": ["status", "reliability", "communication"]
+        }
+      ]
+    },
+    {
+      "id": "healthcare-scheduling",
+      "title": "Healthcare appointment scheduling",
+      "context": "A healthcare provider wants to reduce no-shows and improve patient experience for scheduling visits across multiple clinics.",
+      "cases": [
+        {
+          "id": "health-1",
+          "title": "Appointment reminders",
+          "task": "Design a reminder cadence that reduces no-shows while respecting patient preferences and regulations.",
+          "scale": "medium",
+          "tags": ["healthcare", "notifications", "compliance"]
+        },
+        {
+          "id": "health-2",
+          "title": "Rescheduling flow",
+          "task": "Improve the rescheduling flow so patients can adjust appointments without calling the clinic.",
+          "scale": "small",
+          "tags": ["self-serve", "scheduling", "access"]
+        },
+        {
+          "id": "health-3",
+          "title": "Care team visibility",
+          "task": "Define how care teams should see scheduling status without exposing sensitive patient data.",
+          "scale": "large",
+          "tags": ["privacy", "workflow", "operations"]
+        }
+      ]
+    },
+    {
+      "id": "edtech-learning",
+      "title": "EdTech learning platform",
+      "context": "An EdTech platform wants to improve course completion rates by blending live sessions with asynchronous lessons and better progress tracking.",
+      "cases": [
+        {
+          "id": "edtech-1",
+          "title": "Progress visibility",
+          "task": "Design a progress dashboard that motivates learners without overwhelming them.",
+          "scale": "small",
+          "tags": ["progress", "motivation", "education"]
+        },
+        {
+          "id": "edtech-2",
+          "title": "Live session scheduling",
+          "task": "Create a scheduling flow for live sessions that accounts for time zones and learner availability.",
+          "scale": "medium",
+          "tags": ["scheduling", "timezones", "operations"]
+        },
+        {
+          "id": "edtech-3",
+          "title": "Completion incentives",
+          "task": "Propose incentives and checkpoints that improve course completion without gaming the system.",
+          "scale": "large",
+          "tags": ["retention", "incentives", "learning"]
+        }
+      ]
+    }
+  ]
+}

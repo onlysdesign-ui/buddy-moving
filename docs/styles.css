@@ -39,21 +39,6 @@ body {
   width: auto;
 }
 
-.tests-link {
-  color: #cbd1d6;
-  text-decoration: none;
-  border: 1px solid #2b3034;
-  border-radius: 999px;
-  padding: 8px 16px;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-}
-
-.tests-link:hover {
-  color: #f1f3f4;
-  border-color: #3b4046;
-}
-
 .layout {
   display: grid;
   grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
