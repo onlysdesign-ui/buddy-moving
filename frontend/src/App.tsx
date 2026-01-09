@@ -1,5 +1,5 @@
 import { NavLink, Route, Routes } from "react-router-dom";
-import HomePage from "./pages/HomePage";
+import AnalyzerPage from "./pages/AnalyzerPage";
 import TestsPage from "./pages/TestsPage";
 
 const App = () => {
@@ -18,7 +18,7 @@ const App = () => {
       </header>
       <main className="app-main">
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<AnalyzerPage />} />
           <Route path="/tests" element={<TestsPage />} />
         </Routes>
       </main>
