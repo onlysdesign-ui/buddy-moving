@@ -199,50 +199,428 @@ body {
   background: #f8fafc;
   border-radius: 10px;
   padding: 12px;
-  border: 1px solid #e2e8f0;
 }
 
-.key-block {
-  padding: 8px 0;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.key-block:last-child {
-  border-bottom: none;
-}
-
-.key-title {
+.case-details summary {
+  cursor: pointer;
   font-weight: 600;
-  margin-bottom: 4px;
+  color: #0f172a;
+  margin-bottom: 8px;
 }
 
-.key-summary {
-  color: #475569;
-  margin-bottom: 6px;
-}
-
-.pre-text {
+.case-details pre {
   margin: 0;
-  font-family: inherit;
   white-space: pre-wrap;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+    Menlo, monospace;
+  font-size: 0.82rem;
+  color: #0f172a;
 }
 
-.key-value {
-  background: #0f172a;
-  color: #f8fafc;
-  padding: 10px;
-  border-radius: 8px;
-  white-space: pre-wrap;
-}
-
-.inline-actions {
+.analysis-app {
+  max-width: 1240px;
+  margin: 0 auto;
   display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.text-muted {
+.analysis-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.analysis-left,
+.analysis-right {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.analysis-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.analysis-field span {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+.analysis-field textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 16px 18px;
+  resize: vertical;
+  min-height: 120px;
+  line-height: 1.5;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.analysis-left textarea#task {
+  min-height: 200px;
+}
+
+.analysis-context-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.analysis-context-indicator {
+  background: none;
+  border: none;
   color: #64748b;
-  font-size: 14px;
+  text-align: left;
+  font-size: 0.92rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s ease;
+}
+
+.analysis-context-indicator:hover {
+  color: #0f172a;
+}
+
+.analysis-context-body {
+  display: none;
+}
+
+.analysis-context-panel.open .analysis-context-body {
+  display: block;
+}
+
+.analysis-field textarea:focus {
+  outline: none;
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.analysis-field textarea::placeholder {
+  color: #94a3b8;
+}
+
+.analysis-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.analysis-primary {
+  background: #1d4ed8;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 0 32px;
+  min-height: 48px;
+  font-weight: 600;
+  font-size: 1.05rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+
+.analysis-primary:hover {
+  background: #1e40af;
+}
+
+.analysis-primary:active {
+  background: #1e3a8a;
+}
+
+.analysis-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.analysis-status {
+  display: none;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.95rem;
+  color: #64748b;
+}
+
+.analysis-status.active {
+  display: inline-flex;
+}
+
+.analysis-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(100, 116, 139, 0.35);
+  border-top-color: #1e40af;
+  border-radius: 50%;
+  animation: analysis-spin 0.8s linear infinite;
+}
+
+.analysis-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.analysis-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.analysis-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.analysis-card h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.analysis-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+}
+
+.analysis-card-content {
+  flex: 1;
+  color: #334155;
+  line-height: 1.5;
+  display: block;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+    Menlo, monospace;
+  font-size: 0.86rem;
+  margin: 0;
+}
+
+.analysis-card-content.is-summary {
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.analysis-card-content details {
+  margin-top: 10px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.analysis-card-content summary {
+  cursor: pointer;
+}
+
+.analysis-card-content pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+    Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.analysis-card-status {
+  color: #64748b;
+  font-size: 0.82rem;
+}
+
+.analysis-card-skeleton {
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.analysis-skeleton-line {
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+  background-size: 200% 100%;
+  animation: analysis-shimmer 1.6s ease-in-out infinite;
+  opacity: 0.75;
+}
+
+.analysis-skeleton-line.line-xl {
+  width: 88%;
+}
+
+.analysis-skeleton-line.line-lg {
+  width: 72%;
+}
+
+.analysis-skeleton-line.line-md {
+  width: 58%;
+}
+
+.analysis-skeleton-line.line-sm {
+  width: 42%;
+}
+
+.analysis-card-actions {
+  display: inline-flex;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.analysis-card:hover .analysis-card-actions,
+.analysis-card:focus-within .analysis-card-actions {
+  opacity: 1;
+}
+
+.analysis-card-btn {
+  background: transparent;
+  border: 1px solid rgba(15, 23, 42, 0.18);
+  color: #475569;
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border 0.2s ease, color 0.2s ease;
+}
+
+.analysis-card-btn.icon-only {
+  padding: 4px;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.analysis-card-btn.icon-only svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.analysis-card-btn:hover {
+  border-color: rgba(15, 23, 42, 0.35);
+  color: #0f172a;
+}
+
+.analysis-card-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.analysis-card.loading .analysis-card-content {
+  color: #64748b;
+  font-style: italic;
+}
+
+.analysis-card.skeleton .analysis-card-content {
+  display: none;
+}
+
+.analysis-card.skeleton .analysis-card-skeleton {
+  display: flex;
+}
+
+.analysis-card.skeleton .analysis-card-status {
+  display: block;
+}
+
+.analysis-card-status:empty {
+  display: none;
+}
+
+.analysis-card.error {
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.analysis-card.error .analysis-card-content {
+  color: #b91c1c;
+}
+
+.analysis-card-btn.copied {
+  border-color: rgba(34, 197, 94, 0.6);
+  color: #16a34a;
+}
+
+.analysis-card-error-message {
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.analysis-card-error-details {
+  margin-top: 10px;
+  font-size: 0.82rem;
+  color: #475569;
+}
+
+.analysis-card-error-details pre {
+  margin-top: 8px;
+  white-space: pre-wrap;
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono",
+    Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.analysis-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: #0f172a;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.12);
+  max-width: 280px;
+  font-size: 0.9rem;
+}
+
+.analysis-toast.error {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #b91c1c;
+}
+
+@keyframes analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes analysis-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+
+@media (max-width: 720px) {
+  .analysis-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .analysis-actions {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analysis-primary {
+    width: 100%;
+    justify-content: center;
+  }
 }

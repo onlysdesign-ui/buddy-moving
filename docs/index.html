@@ -1,54 +1,13 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Buddy Moving Analysis</title>
-    <base href="/buddy-moving/" />
-    <link rel="stylesheet" href="styles.css" />
+    <title>BuddyMoving</title>
+    <script type="module" crossorigin src="/buddy-moving/assets/index-BNbf58L6.js"></script>
+    <link rel="stylesheet" crossorigin href="/buddy-moving/assets/index-BLDyOkUs.css">
   </head>
   <body>
-    <div class="app">
-      <header class="topbar">
-        <img class="logo" src="assets/logo.svg" alt="Buddy Moving logo" />
-      </header>
-
-      <section class="layout">
-        <div class="left">
-          <label class="field">
-            <span>Task</span>
-            <textarea id="task" rows="6" placeholder="Describe the moving task you need help with..."></textarea>
-          </label>
-
-          <div class="context-panel" id="context-panel">
-            <button class="context-indicator" id="context-indicator" type="button">
-              + Add context
-            </button>
-            <div class="context-body">
-              <label class="field">
-                <span>Context</span>
-                <textarea id="context" rows="4" placeholder="Add constraints, timeline, budget, or other context..."></textarea>
-              </label>
-            </div>
-          </div>
-
-          <div class="actions">
-            <button id="analyze" class="primary">Analyze</button>
-            <div class="status" id="status">
-              <span class="spinner" aria-hidden="true"></span>
-              <span class="status-text" id="status-text">Analyzing…</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="right">
-          <div class="results-list" id="results-list"></div>
-        </div>
-      </section>
-    </div>
-
-    <div id="toast" class="toast" role="status" aria-live="polite"></div>
-
-    <script src="app.js"></script>
+    <div id="root"></div>
   </body>
 </html>
