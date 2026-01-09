@@ -19,6 +19,35 @@ const formatDuration = (start?: string, end?: string) => {
   return minutes > 0 ? `${minutes}m ${remaining}s` : `${remaining}s`;
 };
 
+const exportCaseResult = (caseResult: CaseResult) => {
+  const context = testContexts.find((item) => item.id === caseResult.contextId);
+  const payload = {
+    case: {
+      id: caseResult.caseId,
+      title: caseResult.title,
+      scale: caseResult.scale,
+    },
+    context: context
+      ? {
+          id: context.id,
+          title: context.title,
+          context: context.context,
+        }
+      : null,
+    tags: caseResult.tags ?? [],
+    response: caseResult.analysis ?? {},
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${caseResult.caseId}.json`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+};
+
 const TestsPage = () => {
   const totalCases = useMemo(() => getTotalCases(), []);
   const [runs, setRuns] = useState<TestRun[]>([]);
@@ -231,6 +260,14 @@ const TestsPage = () => {
           >
             {expanded ? "Collapse" : "Expand"}
           </button>
+          {caseResult.ok && (
+            <button
+              className="button secondary"
+              onClick={() => exportCaseResult(caseResult)}
+            >
+              Export JSON
+            </button>
+          )}
         </div>
         <div className="case-meta">
           <span>Duration: {duration}</span>
