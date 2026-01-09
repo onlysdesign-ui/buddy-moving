@@ -255,7 +255,7 @@ const TestsPage = () => {
                 return (
                   <div className="key-block" key={key}>
                     <div className="key-title">{key}</div>
-                    <div className="key-summary">{value.summary}</div>
+                    <pre className="key-summary pre-text">{value.summary}</pre>
                     <div className="inline-actions">
                       <button
                         className="button secondary"
@@ -336,7 +336,9 @@ const TestsPage = () => {
                     return (
                       <div className="context-section" key={context.id}>
                         <h3>{context.title}</h3>
-                        <p className="text-muted">{context.context}</p>
+                        <pre className="text-muted pre-text">
+                          {context.context}
+                        </pre>
                         {contextCases.map((caseResult) => renderCase(caseResult))}
                       </div>
                     );
