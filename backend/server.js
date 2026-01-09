@@ -24,6 +24,11 @@ const {
 
 const app = express();
 const port = process.env.PORT || 3000;
+const TEST_CASES_PATH = path.join(__dirname, "data", "testcases.json");
+const FALLBACK_TEST_CASES_PATH = path.join(
+  __dirname,
+  "../frontend/src/tests/eval_cases_v2.json"
+);
 
 console.log("OPENAI_API_KEY:", OPENAI_API_KEY ? "set" : "missing");
 console.log("OPENAI_MODEL:", OPENAI_MODEL);
@@ -70,6 +75,38 @@ app.use((req, res, next) => {
 // Middleware
 // ------------------------------
 app.use(express.json());
+
+// ------------------------------
+// Test cases storage
+// ------------------------------
+const ensureTestCasesFile = () => {
+  if (fs.existsSync(TEST_CASES_PATH)) {
+    return;
+  }
+  fs.mkdirSync(path.dirname(TEST_CASES_PATH), { recursive: true });
+  if (fs.existsSync(FALLBACK_TEST_CASES_PATH)) {
+    fs.copyFileSync(FALLBACK_TEST_CASES_PATH, TEST_CASES_PATH);
+    return;
+  }
+  fs.writeFileSync(TEST_CASES_PATH, "[]");
+};
+
+const readTestCases = () => {
+  try {
+    ensureTestCasesFile();
+    const raw = fs.readFileSync(TEST_CASES_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn("[testcases] failed to read cases:", error);
+    return [];
+  }
+};
+
+const writeTestCases = (testCases) => {
+  ensureTestCasesFile();
+  fs.writeFileSync(TEST_CASES_PATH, JSON.stringify(testCases, null, 2));
+};
 
 // ------------------------------
 // Static dist fallback (optional)
@@ -1063,6 +1100,24 @@ app.post("/analyze", async (req, res) => {
       details: err?.message ? String(err.message) : String(err),
     });
   }
+});
+
+app.get("/testcases", (req, res) => {
+  const testCases = readTestCases();
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.send(JSON.stringify(testCases, null, 2));
+});
+
+app.post("/testcases", (req, res) => {
+  const testCases = req.body;
+  if (!Array.isArray(testCases)) {
+    return res.status(400).json({ error: "test cases must be an array" });
+  }
+  writeTestCases(testCases);
+  return res.json({
+    status: "ok",
+    contexts: testCases.length,
+  });
 });
 
 app.post("/analyze/stream", async (req, res) => {

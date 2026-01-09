@@ -7,6 +7,21 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function restoreSpaRoute() {
+        var search = new URLSearchParams(window.location.search);
+        var pathname = search.get("p");
+        var query = search.get("q") || "";
+        var hash = search.get("h") || "";
+        if (pathname) {
+          var nextUrl =
+            decodeURIComponent(pathname) +
+            decodeURIComponent(query) +
+            decodeURIComponent(hash);
+          window.history.replaceState(null, "", nextUrl);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
