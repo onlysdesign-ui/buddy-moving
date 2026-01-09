@@ -66,6 +66,31 @@ body {
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.home-header h1 {
+  margin: 0;
+}
+
+.home-tests-link {
+  text-decoration: none;
+  color: #2563eb;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+}
+
+.home-tests-link:hover {
+  background: #dbeafe;
+}
+
 .button {
   border: none;
   background: #2563eb;
