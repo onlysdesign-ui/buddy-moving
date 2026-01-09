@@ -221,6 +221,12 @@ body {
   margin-bottom: 6px;
 }
 
+.pre-text {
+  margin: 0;
+  font-family: inherit;
+  white-space: pre-wrap;
+}
+
 .key-value {
   background: #0f172a;
   color: #f8fafc;
