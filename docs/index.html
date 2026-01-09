@@ -4,10 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BuddyMoving</title>
-    <script type="module" crossorigin src="/buddy-moving/assets/index-DzN6yQ5c.js"></script>
+    <script type="module" crossorigin src="/buddy-moving/assets/index-BKZGs-05.js"></script>
     <link rel="stylesheet" crossorigin href="/buddy-moving/assets/index-rHXgeX6H.css">
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      (function restoreSpaRoute() {
+        var search = new URLSearchParams(window.location.search);
+        var pathname = search.get("p");
+        var query = search.get("q") || "";
+        var hash = search.get("h") || "";
+        if (pathname) {
+          var nextUrl =
+            decodeURIComponent(pathname) +
+            decodeURIComponent(query) +
+            decodeURIComponent(hash);
+          window.history.replaceState(null, "", nextUrl);
+        }
+      })();
+    </script>
   </body>
 </html>
