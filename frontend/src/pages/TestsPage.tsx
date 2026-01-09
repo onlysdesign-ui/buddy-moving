@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import { getApiBase } from "../config/apiBase";
 import { loadRuns, saveRuns } from "../tests/storage";
-import { getTotalCases, testContexts } from "../tests/testCases";
+import { defaultTestContexts, getTotalCases } from "../tests/testCases";
 import { runTestCase } from "../tests/runTests";
-import type { CaseResult, TestRun } from "../tests/types";
+import type { CaseResult, TestContext, TestRun } from "../tests/types";
 
 const formatDateTime = (value?: string) => {
   if (!value) return "";
@@ -19,8 +20,11 @@ const formatDuration = (start?: string, end?: string) => {
   return minutes > 0 ? `${minutes}m ${remaining}s` : `${remaining}s`;
 };
 
-const exportCaseResult = (caseResult: CaseResult) => {
-  const context = testContexts.find((item) => item.id === caseResult.contextId);
+const exportCaseResult = (
+  caseResult: CaseResult,
+  contexts: TestContext[],
+) => {
+  const context = contexts.find((item) => item.id === caseResult.contextId);
   const payload = {
     case: {
       id: caseResult.caseId,
@@ -49,13 +53,26 @@ const exportCaseResult = (caseResult: CaseResult) => {
 };
 
 const TestsPage = () => {
-  const totalCases = useMemo(() => getTotalCases(), []);
+  const apiBase = getApiBase();
+  const [testContexts, setTestContexts] = useState<TestContext[]>(
+    defaultTestContexts,
+  );
+  const totalCases = useMemo(
+    () => getTotalCases(testContexts),
+    [testContexts],
+  );
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState({ completed: 0, total: totalCases });
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const [expandedCases, setExpandedCases] = useState<Set<string>>(new Set());
   const [expandedValues, setExpandedValues] = useState<Set<string>>(new Set());
+  const [casesError, setCasesError] = useState<string | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<
+    "idle" | "uploading" | "success" | "error"
+  >("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cancelRequested = useRef(false);
   const activeController = useRef<AbortController | null>(null);
 
@@ -68,8 +85,37 @@ const TestsPage = () => {
   }, []);
 
   useEffect(() => {
+    const loadTestCases = async () => {
+      try {
+        const response = await fetch(`${apiBase}/testcases`);
+        if (!response.ok) {
+          throw new Error("Failed to load test cases");
+        }
+        const data = (await response.json()) as TestContext[];
+        if (Array.isArray(data) && data.length > 0) {
+          setTestContexts(data);
+        }
+        setCasesError(null);
+      } catch (error) {
+        setCasesError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load test cases",
+        );
+      }
+    };
+    loadTestCases();
+  }, [apiBase]);
+
+  useEffect(() => {
     saveRuns(runs);
   }, [runs]);
+
+  useEffect(() => {
+    if (!isRunning) {
+      setProgress((prev) => ({ ...prev, total: totalCases }));
+    }
+  }, [isRunning, totalCases]);
 
   const toggleRun = (runId: string) => {
     setExpandedRuns((prev) => {
@@ -161,7 +207,7 @@ const TestsPage = () => {
           const result = await runTestCase({
             testCase,
             context,
-            apiBase: getApiBase(),
+            apiBase,
             signal: controller.signal,
             onUpdate: (updated) => {
               updateRun(runId, (run) => upsertCase(run, updated));
@@ -237,6 +283,39 @@ const TestsPage = () => {
     activeController.current?.abort();
   };
 
+  const handleUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadStatus("uploading");
+    setUploadError(null);
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!Array.isArray(parsed)) {
+        throw new Error("Файл должен содержать массив тесткейсов");
+      }
+      const response = await fetch(`${apiBase}/testcases`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+      if (!response.ok) {
+        throw new Error("Не удалось загрузить тесткейсы на сервер");
+      }
+      setTestContexts(parsed as TestContext[]);
+      setUploadStatus("success");
+    } catch (error) {
+      setUploadStatus("error");
+      setUploadError(
+        error instanceof Error ? error.message : "Ошибка загрузки тесткейсов",
+      );
+    } finally {
+      if (event.target) {
+        event.target.value = "";
+      }
+    }
+  };
+
   const renderCase = (caseResult: CaseResult) => {
     const expanded = expandedCases.has(caseResult.caseId);
     const duration = formatDuration(caseResult.startedAt, caseResult.finishedAt);
@@ -263,7 +342,7 @@ const TestsPage = () => {
           {caseResult.ok && (
             <button
               className="button secondary"
-              onClick={() => exportCaseResult(caseResult)}
+              onClick={() => exportCaseResult(caseResult, testContexts)}
             >
               Export JSON
             </button>
@@ -321,6 +400,30 @@ const TestsPage = () => {
           <button className="button" onClick={startRun} disabled={isRunning}>
             Прогнать тесты
           </button>
+          <button
+            className="button secondary"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isRunning || uploadStatus === "uploading"}
+          >
+            {uploadStatus === "uploading"
+              ? "Загрузка кейсов..."
+              : "Загрузить новые кейсы"}
+          </button>
+          <a
+            className="button secondary"
+            href={`${apiBase}/testcases`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Текущий файл тесткейсов
+          </a>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/json"
+            onChange={handleUpload}
+            hidden
+          />
           {isRunning && (
             <button className="button secondary" onClick={cancelRun}>
               Cancel
@@ -332,6 +435,15 @@ const TestsPage = () => {
             </span>
           )}
         </div>
+        {casesError && (
+          <div className="text-muted">Test cases warning: {casesError}</div>
+        )}
+        {uploadStatus === "error" && uploadError && (
+          <div className="text-muted">Upload error: {uploadError}</div>
+        )}
+        {uploadStatus === "success" && (
+          <div className="text-muted">Кейсы обновлены для следующих прогонов.</div>
+        )}
       </div>
 
       <div className="run-list">
