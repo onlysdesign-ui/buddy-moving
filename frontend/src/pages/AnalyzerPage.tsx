@@ -307,6 +307,17 @@ const AnalyzerPage = () => {
     const controller = new AbortController();
     const requestId = ++activeStreamId.current;
     activeController.current = controller;
+    const completedKeys = new Set<AnalysisKey>();
+
+    const markKeyDone = (key: AnalysisKey) => {
+      completedKeys.add(key);
+      if (
+        completedKeys.size === DEFAULT_KEYS.length &&
+        !controller.signal.aborted
+      ) {
+        controller.abort();
+      }
+    };
 
     setIsAnalyzing(true);
     updateProgress();
@@ -345,6 +356,7 @@ const AnalyzerPage = () => {
           const summaryValue = payload.summary ?? "";
           const valueValue = payload.value ?? payload.summary ?? "";
           updateAnalysisKey(payload.key, summaryValue, valueValue);
+          markKeyDone(payload.key);
         },
         onError: (payload) => {
           if (payload.key) {
@@ -353,6 +365,7 @@ const AnalyzerPage = () => {
               payload.error || "Failed to generate.",
               payload.details,
             );
+            markKeyDone(payload.key);
           } else if (payload.error) {
             showToast(payload.error, "error");
           }
