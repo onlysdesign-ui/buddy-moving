@@ -8,7 +8,7 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 30000;
+const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 60000;
 const STRICT_MODE = process.env.STRICT_MODE === "true";
 const OPENAI_TEMPERATURE = Number(process.env.OPENAI_TEMPERATURE ?? 0.45);
 const TOKENS_DEEPER = Number(process.env.TOKENS_DEEPER ?? 1100);
@@ -1049,6 +1049,11 @@ app.post("/analyze", async (req, res) => {
     const context =
       typeof req.body?.context === "string" ? req.body.context.trim() : "";
 
+    console.log("[route] /analyze called", {
+      hasTask: Boolean(task),
+      hasContext: Boolean(context),
+    });
+
     if (!task) {
       return res.status(400).json({ error: "task is required" });
     }
@@ -1139,6 +1144,12 @@ app.post("/analyze/stream", async (req, res) => {
     ? req.body.keys.filter((key) => analysisKeys.includes(key))
     : analysisKeys;
   const keysToAnalyze = requestedKeys.length ? requestedKeys : analysisKeys;
+
+  console.log("[route] /analyze/stream called", {
+    hasTask: Boolean(task),
+    hasContext: Boolean(context),
+    keys: keysToAnalyze,
+  });
 
   if (!task) {
     return res.status(400).json({ error: "task is required" });
