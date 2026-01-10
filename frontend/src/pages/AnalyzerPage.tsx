@@ -111,6 +111,7 @@ const AnalyzerPage = () => {
   const activeController = useRef<AbortController | null>(null);
   const activeStreamId = useRef(0);
   const skipSyncRef = useRef(0);
+  const prevActiveTaskIdRef = useRef<string | null>(null);
 
   const activeTask = useMemo(
     () => tasks.find((entry) => entry.id === activeTaskId) ?? null,
@@ -508,6 +509,9 @@ const AnalyzerPage = () => {
   }, [persistTasks, tasks]);
 
   useEffect(() => {
+    const isSwitchingTask = prevActiveTaskIdRef.current !== activeTaskId;
+    prevActiveTaskIdRef.current = activeTaskId;
+
     if (!activeTaskId) {
       setTask("");
       setContext("");
@@ -525,7 +529,7 @@ const AnalyzerPage = () => {
     setIsAnalyzing(false);
     setStatusText("Analyzing…");
 
-    if (activeTask) {
+    if (activeTask && isSwitchingTask) {
       skipSyncRef.current = 3;
       setTask(activeTask.task);
       setContext(activeTask.context);
