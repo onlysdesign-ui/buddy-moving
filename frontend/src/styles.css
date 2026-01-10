@@ -229,6 +229,128 @@ body {
   gap: 24px;
 }
 
+.analysis-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.analysis-back {
+  background: transparent;
+  border: 1px solid #343434;
+  color: #e5e7eb;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border 0.2s ease, color 0.2s ease;
+}
+
+.analysis-back:hover {
+  border-color: #4b5563;
+  color: #ffffff;
+}
+
+.analysis-task-meta {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.task-list {
+  max-width: 920px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.task-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.task-list-title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.task-list-subtitle {
+  margin: 6px 0 0;
+  color: #9ca3af;
+  font-size: 0.95rem;
+}
+
+.task-list-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.task-list-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.task-list-item {
+  border: 1px solid #343434;
+  border-radius: 16px;
+  background: #272727;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  transition: border 0.2s ease, transform 0.2s ease;
+}
+
+.task-list-item:hover {
+  border-color: #4b5563;
+  transform: translateY(-1px);
+}
+
+.task-list-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.task-list-item-title {
+  font-weight: 600;
+  color: #f3f4f6;
+}
+
+.task-list-item-meta {
+  font-size: 0.85rem;
+  color: #9ca3af;
+}
+
+.task-list-item-action {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #a5b4fc;
+}
+
+.task-list-empty {
+  border: 1px dashed #343434;
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  color: #9ca3af;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
 .analysis-layout {
   display: grid;
   grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
@@ -615,6 +737,17 @@ body {
 }
 
 @media (max-width: 720px) {
+  .analysis-toolbar,
+  .task-list-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analysis-back {
+    width: 100%;
+    justify-content: center;
+  }
+
   .analysis-layout {
     grid-template-columns: 1fr;
   }
