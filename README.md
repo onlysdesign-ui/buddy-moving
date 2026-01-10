@@ -1,21 +1,149 @@
 # BuddyMoving
 
-BuddyMoving is a product-design copilot that turns a task description into a
-structured analysis (audience, metrics, risks, questions, scenarios, and
-approaches) by calling OpenAI from a lightweight Node/Express backend and
-serving a static frontend (GitHub Pages) or the optional Vite build.
+## Вижн и основная идея
 
-**Live demo (Render):** https://buddy-moving.onrender.com
+**Для кого:**
+- продакт‑менеджеры, UX‑/CX‑дизайнеры, исследователи и команды, которым нужно быстро превратить неструктурный запрос в понятный план продуктовой проработки.
 
-## Deploy Frontend to GitHub Pages
+**Что делаем:**
+- превращаем «сырое» описание задачи в структурированную продуктовую аналитическую выжимку с понятными блоками (problem framing, неизвестные, варианты решений, решение, план экспериментов, рабочий пакет).
 
-**Pages URL:** `https://<your-github-username>.github.io/buddy-moving/`
+**Главная фишка:**
+- выводы каждого блока реально влияют на следующий, полностью повторяя логику дизайн‑процесса и выстраивая сквозную цепочку решений.
 
-The Vite base path is set to `/buddy-moving/` for GitHub Pages, so assets and routes load correctly from that subpath.
+**Почему это лучше обычного чата с GPT:**
+- BuddyMoving снимает туннелирование в одно решение и заставляет глубже анализировать задачу через обязательные этапы разборки, что снижает риск преждевременных выводов.
 
-**Optional backend API base**
-- Set `VITE_API_BASE` at build time if you want Pages to talk to a backend.
-- Example in `.github/workflows/deploy-pages.yml`:
+BuddyMoving — это продуктовый копилот, который берет описание задачи и контекст, обращается к OpenAI через Node/Express‑бэкенд и возвращает структурированный анализ. Фронтенд доступен как статическая страница (GitHub Pages, `docs/`) или как Vite‑приложение для локальной разработки.
+
+**Вижн:**
+- помогаем продуктологам проводить задачу по гипотезам и подсвечиваем то, что они могли упустить на каждом шаге.
+
+**Live demo:**
+- GitHub Pages (frontend): `https://<your-github-username>.github.io/buddy-moving/`
+- Render (backend API): https://buddy-moving.onrender.com  
+  Если на Render отображается сообщение `Frontend not built`, значит собран только бэкенд — это нормально для API‑демо. Чтобы показать UI на Render, нужно запускать сборку Vite (`npm run build`) и публиковать `dist/`.
+
+---
+
+## Основной функционал
+
+- **Структурированный анализ задачи** по шести ключам:
+  - `framing` — постановка проблемы и ограничений;
+  - `unknowns` — неизвестные и риски;
+  - `solution_space` — пространство решений;
+  - `decision` — рекомендации и направления;
+  - `experiment_plan` — план проверки гипотез;
+  - `work_package` — план работ/следующие шаги.
+- **Streaming‑режим (SSE):** можно получать блоки анализа постепенно.
+- **Углубление отдельного блока:** запрос на детальную проработку одного ключа.
+- **Проверка качества блока:** валидация и уточнение конкретного раздела анализа.
+- **Регрессионная проверка качества API:** быстрый smoke‑тест `POST /analyze` через `npm run analyze:test`.
+
+---
+
+## Архитектура
+
+- **Backend:** Node.js + Express (эндпоинты `/analyze`, `/analyze/stream`, `/analyze/deeper`, `/analyze/verify`).
+- **Frontend:**
+  - статический фронтенд в `docs/` (удобно для GitHub Pages);
+  - опционально Vite‑фронтенд в `frontend/` для разработки (React + TypeScript + Vite).
+- **Интеграция с LLM:** бэкенд формирует промпт и обращается к OpenAI API.
+
+## Технологии и зависимости
+
+- **Backend:** Node.js, Express, OpenAI SDK, dotenv.
+- **Frontend:** React, React Router, TypeScript, Vite.
+- **Тестирование:** Jest (юнит‑тесты), smoke‑тест скриптом `backend/scripts/analyze-test.js`.
+
+---
+
+## Структура репозитория
+
+```
+.
+├── backend/          # Node/Express API
+├── docs/             # Статический фронтенд (GitHub Pages)
+├── frontend/         # Vite‑фронтенд (dev + сборка)
+└── README.md         # Эта документация
+```
+
+---
+
+## Быстрый старт (локально)
+
+### 1) Backend
+
+```bash
+cd backend
+npm install
+# Создайте backend/.env с ключами:
+# OPENAI_API_KEY=...
+# OPENAI_MODEL=gpt-4o-mini
+node server.js
+```
+
+По умолчанию сервер стартует на `http://localhost:3000`.
+
+### 2) Frontend (статическая версия)
+
+```bash
+cd docs
+# Откройте index.html в браузере или поднимите простой static server
+# Убедитесь, что API base в docs/app.js указывает на ваш backend.
+```
+
+### 3) Frontend (Vite, опционально)
+
+```bash
+cd frontend
+npm install
+# В frontend/.env задайте VITE_API_BASE=http://localhost:3000
+npm run dev
+```
+
+---
+
+## Переменные окружения
+
+### Backend (`backend/.env`)
+- `OPENAI_API_KEY` — ключ OpenAI API.
+- `OPENAI_MODEL` — имя модели (по умолчанию `gpt-4o-mini`).
+
+### Frontend (`frontend/.env`)
+- `VITE_API_BASE` — базовый URL бэкенда.
+
+---
+
+## Регрессионное тестирование
+
+Чтобы быстро проверить, что система работает корректно и возвращает ожидаемую структуру:
+
+1) **Smoke‑тест API** (один запрос к `/analyze`):
+```bash
+cd backend
+ANALYZE_TEST_URL=http://localhost:3000 npm run analyze:test
+```
+
+2) **Юнит‑тесты логики case file**:
+```bash
+cd backend
+npm test
+```
+
+---
+
+## Деплой
+
+### GitHub Pages (статическая версия)
+
+**URL:** `https://<your-github-username>.github.io/buddy-moving/`
+
+Vite base path уже настроен на `/buddy-moving/`.
+
+**Опционально: backend API base**
+- Задайте `VITE_API_BASE` во время сборки.
+- Пример в `.github/workflows/deploy-pages.yml`:
   ```yaml
   - name: Build
     run: npm --prefix frontend run build
@@ -23,39 +151,7 @@ The Vite base path is set to `/buddy-moving/` for GitHub Pages, so assets and ro
       VITE_API_BASE: https://your-backend.example.com
   ```
 
-## Local run (frontend + backend)
-
-```bash
-# Backend
-cd backend
-npm install
-# Create backend/.env with:
-# OPENAI_API_KEY=...
-# OPENAI_MODEL=gpt-4o-mini
-node server.js
-```
-
-```bash
-# Frontend
-cd docs
-# Open index.html or serve this folder with a static server
-# Ensure the API base in docs/app.js points to your backend.
-```
-
-**Optional Vite build:** If you use the Vite frontend, set `VITE_API_BASE` in
-`frontend/.env` (e.g. http://localhost:3000) and run `npm install` + `npm run dev`
-inside `frontend/`.
-
-## Environment variables
-
-Backend (`backend/.env`):
-- `OPENAI_API_KEY` – OpenAI API key
-- `OPENAI_MODEL` – model name (default: gpt-4o-mini)
-
-Frontend (`frontend/.env`):
-- `VITE_API_BASE` – backend base URL
-
-## Render deployment
+### Render
 
 **Build command**
 ```bash
@@ -69,44 +165,76 @@ npm run start
 
 **Environment variables (Render)**
 - `OPENAI_API_KEY`, `OPENAI_MODEL`
-- `VITE_API_BASE` (set to the Render URL of this service if using Vite)
+- `VITE_API_BASE` (если используете Vite‑фронтенд)
 - `NPM_CONFIG_REGISTRY=https://registry.npmjs.org/`
 
-## Troubleshooting
+---
 
-**“VITE_API_BASE is not configured”**
-- Ensure `frontend/.env` exists and contains `VITE_API_BASE=...`.
-- Restart the dev server after changes.
+## API (подробно)
 
-**npm install 403 registry issue**
-- Add a `.npmrc` in the repo root:
-  ```
-  registry=https://registry.npmjs.org/
-  always-auth=false
-  ```
-
-## API endpoints
-
-**POST `/analyze`**
-- Body: `{ task, context }`
-- Returns: `{ analysis, language }`
+### POST `/analyze`
+- **Body:** `{ task, context }`
+- **Response:** `{ analysis, language }`
 - `language` определяется только по `task`.
 
-**POST `/analyze/stream` (SSE)**
-- Body: `{ task, context }`
-- Streams events:
+**Пример:**
+```bash
+curl -X POST http://localhost:3000/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"task":"Improve onboarding for new movers","context":"We have high drop-off after step 2."}'
+```
+
+### POST `/analyze/stream` (SSE)
+- **Body:** `{ task, context, keys? }`
+- **Response events:**
   - `event: key` → `{ key, value, status }`
   - `event: status` → `{ status, completed, total }`
   - `event: error` → `{ key, error, details }`
   - `event: done` → `{ status: "done" }`
 - `language` в `status` определяется только по `task`.
 
-**POST `/analyze/deeper`**
-- Body: `{ task, context, key, currentAnalysis }`
-- Returns: `{ key, value, language }`
-- `language` определяется только по `task`.
+**Пример:**
+```bash
+curl -N -H "Content-Type: application/json" \
+  -d '{"task":"Design a moving assistant for renters","context":"Focus on students moving between dorms","keys":["framing","unknowns","solution_space","decision","experiment_plan","work_package"]}' \
+  http://localhost:3000/analyze/stream
+```
 
-**POST `/analyze/verify`**
-- Body: `{ task, context, key, value, currentAnalysis }`
-- Returns: `{ key, value, language }`
-- `language` определяется только по `task`.
+### POST `/analyze/deeper`
+- **Body:** `{ task, context, key, currentAnalysis }`
+- **Response:** `{ key, value, language }`
+
+### POST `/analyze/verify`
+- **Body:** `{ task, context, key, value, currentAnalysis }`
+- **Response:** `{ key, value, language }`
+
+---
+
+## Troubleshooting
+
+**“VITE_API_BASE is not configured”**
+- Проверьте, что `frontend/.env` существует и содержит `VITE_API_BASE=...`.
+- Перезапустите dev‑сервер.
+
+**npm install 403 registry issue**
+- Добавьте `.npmrc` в корень репозитория:
+  ```
+  registry=https://registry.npmjs.org/
+  always-auth=false
+  ```
+
+---
+
+## Примеры запросов к Render
+
+```bash
+curl -X POST https://buddy-moving.onrender.com/analyze \
+  -H "Content-Type: application/json" \
+  -d '{"task":"Reduce drop-off in the moving checklist","context":"Most users abandon after step 2."}'
+```
+
+```bash
+curl -N -H "Content-Type: application/json" \
+  -d '{"task":"Improve move planning for renters","context":"Focus on short-notice moves","keys":["framing","unknowns","solution_space","decision","experiment_plan","work_package"]}' \
+  https://buddy-moving.onrender.com/analyze/stream
+```
