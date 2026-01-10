@@ -309,6 +309,9 @@ const AnalyzerPage = () => {
     activeController.current = controller;
     const completedKeys = new Set<AnalysisKey>();
     let sawAnyKey = false;
+    let sawAnyEvent = false;
+    let attemptedFallback = false;
+    let streamStartTimeout: number | null = null;
 
     const markKeyDone = (key: AnalysisKey) => {
       completedKeys.add(key);
@@ -329,12 +332,19 @@ const AnalyzerPage = () => {
     });
 
     try {
+      streamStartTimeout = window.setTimeout(() => {
+        if (!sawAnyEvent && !controller.signal.aborted) {
+          controller.abort();
+        }
+      }, 10000);
+
       await streamAnalysis({
         task: trimmedTask,
         context: trimmedContext,
         signal: controller.signal,
         keys: DEFAULT_KEYS,
         onStatus: (payload) => {
+          sawAnyEvent = true;
           if (payload.status === "key-start" && payload.key) {
             setCardLoading(payload.key, true, "Analyzing…");
             return;
@@ -354,6 +364,7 @@ const AnalyzerPage = () => {
           }
         },
         onKey: (payload) => {
+          sawAnyEvent = true;
           const summaryValue = payload.summary ?? "";
           const valueValue = payload.value ?? payload.summary ?? "";
           updateAnalysisKey(payload.key, summaryValue, valueValue);
@@ -361,6 +372,7 @@ const AnalyzerPage = () => {
           sawAnyKey = true;
         },
         onError: (payload) => {
+          sawAnyEvent = true;
           if (payload.key) {
             setCardError(
               payload.key,
@@ -373,12 +385,42 @@ const AnalyzerPage = () => {
           }
         },
       });
+      if (streamStartTimeout) {
+        window.clearTimeout(streamStartTimeout);
+        streamStartTimeout = null;
+      }
+
+      if (!sawAnyKey) {
+        attemptedFallback = true;
+        const data = await fetchAnalysis({
+          task: trimmedTask,
+          context: trimmedContext,
+          keys: DEFAULT_KEYS,
+          signal: controller.signal,
+        });
+        applyAnalysisResponse(data);
+      }
       showToast("Analysis complete.");
     } catch (error) {
       if (controller.signal.aborted) {
         return;
       }
-      if (!sawAnyKey) {
+      if (streamStartTimeout) {
+        window.clearTimeout(streamStartTimeout);
+        streamStartTimeout = null;
+      }
+      if (!sawAnyKey && attemptedFallback) {
+        const message =
+          error instanceof Error ? error.message : "Analysis failed.";
+        DEFAULT_KEYS.forEach((key) => {
+          if (!completedKeys.has(key)) {
+            setCardError(key, "Analysis failed.", message);
+          }
+        });
+        showToast(`Analysis failed. ${message}`, "error");
+        return;
+      }
+      if (!sawAnyKey && !attemptedFallback) {
         try {
           const data = await fetchAnalysis({
             task: trimmedTask,
