@@ -40,7 +40,9 @@ export interface CaseResult {
   ok: boolean;
   language?: string;
   error?: string;
-  analysis?: Partial<Record<AnalysisKey, Omit<KeyResult, "status">>>;
+  analysis?: Partial<
+    Record<AnalysisKey, Omit<KeyResult, "status"> | string>
+  >;
   keyStatus?: Partial<Record<AnalysisKey, KeyResult>>;
 }
 
