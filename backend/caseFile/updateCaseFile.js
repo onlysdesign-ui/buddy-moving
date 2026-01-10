@@ -55,6 +55,68 @@ let openaiModel = "gpt-4o-mini";
 let timeoutMs = 30000;
 let runWithTimeout = null;
 
+function extractJsonCandidate(content) {
+  if (typeof content !== "string") return "";
+  const start = content.indexOf("{");
+  const end = content.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    return content.trim();
+  }
+  return content.slice(start, end + 1).trim();
+}
+
+async function requestJsonRepair(rawContent) {
+  if (!openaiClient) {
+    throw new Error("OpenAI client is not configured for updateCaseFile");
+  }
+  const candidate = extractJsonCandidate(rawContent);
+  const prompt = [
+    "Fix the JSON so it is valid and parseable.",
+    "Return ONLY a JSON object. No markdown.",
+    "If the input is empty or not JSON, return {}.",
+    "",
+    "Input:",
+    candidate || "(empty)",
+  ].join("\n");
+
+  const executeRequest = (signal) =>
+    openaiClient.chat.completions.create(
+      {
+        model: openaiModel,
+        messages: [
+          { role: "system", content: "You return valid JSON only." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0,
+        max_tokens: 300,
+        response_format: { type: "json_object" },
+      },
+      { signal }
+    );
+
+  let response;
+  if (runWithTimeout) {
+    const result = await runWithTimeout(
+      "OpenAI caseFile repair",
+      timeoutMs,
+      executeRequest
+    );
+    if (!result.ok) {
+      throw result.error;
+    }
+    response = result.value;
+  } else {
+    response = await executeRequest();
+  }
+
+  const content = response?.choices?.[0]?.message?.content;
+  if (!content || typeof content !== "string") {
+    throw new Error("OpenAI caseFile repair response was empty");
+  }
+
+  return JSON.parse(content);
+}
+
 function configureCaseFileUpdater({ client, model, timeout, timeoutMs: nextTimeoutMs, runWithTimeout: nextRunWithTimeout }) {
   if (client) openaiClient = client;
   if (model) openaiModel = model;
@@ -333,9 +395,20 @@ async function updateCaseFile(cardType, cardText, caseFile, task, context) {
   try {
     patch = JSON.parse(content);
   } catch (error) {
-    const parseError = new Error("OpenAI caseFile response was not valid JSON");
-    parseError.cause = error;
-    throw parseError;
+    try {
+      patch = await requestJsonRepair(content);
+      console.warn(
+        "[casefile] repaired invalid JSON from OpenAI response",
+        error
+      );
+    } catch (repairError) {
+      const parseError = new Error(
+        "OpenAI caseFile response was not valid JSON"
+      );
+      parseError.cause = error;
+      parseError.repairError = repairError;
+      throw parseError;
+    }
   }
 
   return mergeCaseFile(caseFile, patch);
