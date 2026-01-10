@@ -3,11 +3,9 @@ import AnalysisCard from "../components/AnalysisCard";
 import {
   DEFAULT_KEYS,
   KEY_TITLES,
-  fetchAnalysis,
   runAnalysisAction,
   streamAnalysis,
   type AnalysisKey,
-  type AnalysisResponse,
 } from "../api/analyzeClient";
 
 const STORAGE_KEYS = {
@@ -203,33 +201,6 @@ const AnalyzerPage = () => {
     }));
   };
 
-  const applyAnalysisResponse = (data: AnalysisResponse) => {
-    const analysis =
-      data?.analysis && typeof data.analysis === "object" ? data.analysis : {};
-
-    setAnalysisState(
-      DEFAULT_KEYS.reduce<Record<AnalysisKey, AnalysisEntry>>((acc, key) => {
-        const entry = analysis[key];
-        const resolvedEntry: AnalysisEntry = {
-          summary: "",
-          value: "",
-          isExpanded: false,
-          status: "done",
-          error: null,
-          statusText: "",
-        };
-        if (typeof entry === "string") {
-          resolvedEntry.value = entry;
-        } else if (entry && typeof entry === "object") {
-          resolvedEntry.summary = entry.summary ?? "";
-          resolvedEntry.value = entry.value ?? entry.summary ?? "";
-        }
-        acc[key] = resolvedEntry;
-        return acc;
-      }, {} as Record<AnalysisKey, AnalysisEntry>),
-    );
-  };
-
   const getFullAnalysisMap = () =>
     Object.fromEntries(
       DEFAULT_KEYS.map((key) => {
@@ -310,7 +281,6 @@ const AnalyzerPage = () => {
     const completedKeys = new Set<AnalysisKey>();
     let sawAnyKey = false;
     let sawAnyEvent = false;
-    let attemptedFallback = false;
     let streamStartTimeout: number | null = null;
 
     const markKeyDone = (key: AnalysisKey) => {
@@ -391,14 +361,17 @@ const AnalyzerPage = () => {
       }
 
       if (!sawAnyKey) {
-        attemptedFallback = true;
-        const data = await fetchAnalysis({
-          task: trimmedTask,
-          context: trimmedContext,
-          keys: DEFAULT_KEYS,
-          signal: controller.signal,
+        DEFAULT_KEYS.forEach((key) => {
+          if (!completedKeys.has(key)) {
+            setCardError(
+              key,
+              "Analysis failed.",
+              "No streaming analysis results received.",
+            );
+          }
         });
-        applyAnalysisResponse(data);
+        showToast("Analysis failed. No streaming results received.", "error");
+        return;
       }
       showToast("Analysis complete.");
     } catch (error) {
@@ -409,7 +382,7 @@ const AnalyzerPage = () => {
         window.clearTimeout(streamStartTimeout);
         streamStartTimeout = null;
       }
-      if (!sawAnyKey && attemptedFallback) {
+      if (!sawAnyKey) {
         const message =
           error instanceof Error ? error.message : "Analysis failed.";
         DEFAULT_KEYS.forEach((key) => {
@@ -419,31 +392,6 @@ const AnalyzerPage = () => {
         });
         showToast(`Analysis failed. ${message}`, "error");
         return;
-      }
-      if (!sawAnyKey && !attemptedFallback) {
-        try {
-          const data = await fetchAnalysis({
-            task: trimmedTask,
-            context: trimmedContext,
-            keys: DEFAULT_KEYS,
-            signal: controller.signal,
-          });
-          applyAnalysisResponse(data);
-          showToast("Analysis complete.");
-          return;
-        } catch (fallbackError) {
-          const message =
-            fallbackError instanceof Error
-              ? fallbackError.message
-              : "Analysis failed.";
-          DEFAULT_KEYS.forEach((key) => {
-            if (!completedKeys.has(key)) {
-              setCardError(key, "Analysis failed.", message);
-            }
-          });
-          showToast(`Analysis failed. ${message}`, "error");
-          return;
-        }
       }
       DEFAULT_KEYS.forEach((key) => {
         if (!completedKeys.has(key)) {
