@@ -317,14 +317,15 @@ const TestsPage = () => {
   };
 
   const renderCase = (caseResult: CaseResult) => {
-    const expanded = expandedCases.has(caseResult.caseId);
+    const caseKey = `${caseResult.contextId}:${caseResult.caseId}`;
+    const expanded = expandedCases.has(caseKey);
     const duration = formatDuration(caseResult.startedAt, caseResult.finishedAt);
     const tags = caseResult.tags || [];
     const visibleTags = tags.slice(0, 3);
     const remainingTags = tags.length - visibleTags.length;
 
     return (
-      <div className="case-row" key={caseResult.caseId}>
+      <div className="case-row" key={caseKey}>
         <div className="case-header">
           <span className={`badge scale-${caseResult.scale}`}>
             {caseResult.scale}
@@ -335,7 +336,7 @@ const TestsPage = () => {
           </span>
           <button
             className="button secondary"
-            onClick={() => toggleCase(caseResult.caseId)}
+            onClick={() => toggleCase(caseKey)}
           >
             {expanded ? "Collapse" : "Expand"}
           </button>
@@ -366,22 +367,32 @@ const TestsPage = () => {
             {caseResult.analysis &&
               Object.entries(caseResult.analysis).map(([key, value]) => {
                 if (!value) return null;
-                const valueId = `${caseResult.caseId}:${key}`;
+                const normalized =
+                  typeof value === "string"
+                    ? { summary: value, value }
+                    : {
+                        summary: value.summary ?? value.value ?? "",
+                        value: value.value ?? value.summary ?? "",
+                      };
+                if (!normalized.summary && !normalized.value) return null;
+                const valueId = `${caseKey}:${key}`;
                 const isValueExpanded = expandedValues.has(valueId);
                 return (
                   <div className="key-block" key={key}>
                     <div className="key-title">{key}</div>
-                    <pre className="key-summary pre-text">{value.summary}</pre>
+                    <pre className="key-summary pre-text">
+                      {normalized.summary}
+                    </pre>
                     <div className="inline-actions">
                       <button
                         className="button secondary"
-                        onClick={() => toggleValue(caseResult.caseId, key)}
+                        onClick={() => toggleValue(caseKey, key)}
                       >
                         {isValueExpanded ? "Hide full" : "Show full"}
                       </button>
                     </div>
                     {isValueExpanded && (
-                      <pre className="key-value">{value.value}</pre>
+                      <pre className="key-value">{normalized.value}</pre>
                     )}
                   </div>
                 );
