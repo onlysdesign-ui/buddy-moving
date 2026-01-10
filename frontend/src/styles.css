@@ -37,6 +37,13 @@ body {
   color: #f3f4f6;
 }
 
+.app-version {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
 .app-nav {
   display: flex;
   gap: 12px;

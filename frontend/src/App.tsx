@@ -6,7 +6,9 @@ const App = () => {
   return (
     <div className="app">
       <header className="app-header">
-        <div className="app-brand">BuddyMoving</div>
+        <div className="app-brand">
+          BuddyMoving <span className="app-version">v{__APP_VERSION__}</span>
+        </div>
         <nav className="app-nav">
           <NavLink to="/" className="nav-link" end>
             Home
