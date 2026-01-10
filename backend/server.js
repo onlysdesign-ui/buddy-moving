@@ -42,10 +42,18 @@ console.log("TOKENS_VERIFY:", TOKENS_VERIFY);
 // ------------------------------
 
 // Разрешаем твой GitHub Pages + локальную разработку
-const ALLOWED_ORIGINS = new Set([
+const DEFAULT_ALLOWED_ORIGINS = [
   "https://onlysdesign-ui.github.io",
   "http://localhost:3000",
   "http://localhost:5173",
+];
+const extraAllowedOrigins = (process.env.EXTRA_ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const ALLOWED_ORIGINS = new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...extraAllowedOrigins,
 ]);
 
 app.use((req, res, next) => {
@@ -58,7 +66,10 @@ app.use((req, res, next) => {
 
   // Разрешаем нужные методы и заголовки
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Accept"
+  );
 
   // Если вдруг в будущем понадобится куки - можно включить:
   // res.setHeader("Access-Control-Allow-Credentials", "true");
