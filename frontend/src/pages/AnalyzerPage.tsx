@@ -308,6 +308,8 @@ const AnalyzerPage = () => {
     const requestId = ++activeStreamId.current;
     activeController.current = controller;
     const completedKeys = new Set<AnalysisKey>();
+    let sawAnyKey = false;
+    let attemptedFallback = false;
 
     const markKeyDone = (key: AnalysisKey) => {
       completedKeys.add(key);
@@ -357,6 +359,7 @@ const AnalyzerPage = () => {
           const valueValue = payload.value ?? payload.summary ?? "";
           updateAnalysisKey(payload.key, summaryValue, valueValue);
           markKeyDone(payload.key);
+          sawAnyKey = true;
         },
         onError: (payload) => {
           if (payload.key) {
@@ -371,15 +374,33 @@ const AnalyzerPage = () => {
           }
         },
       });
+      if (!sawAnyKey) {
+        attemptedFallback = true;
+        const data = await fetchAnalysis({
+          task: trimmedTask,
+          context: trimmedContext,
+          keys: DEFAULT_KEYS,
+          signal: controller.signal,
+        });
+        applyAnalysisResponse(data);
+      }
       showToast("Analysis complete.");
     } catch (error) {
       if (controller.signal.aborted) {
         return;
       }
-      if (
-        error instanceof Error &&
-        error.message.includes("Streaming is not supported")
-      ) {
+      if (!sawAnyKey && attemptedFallback) {
+        const message =
+          error instanceof Error ? error.message : "Analysis failed.";
+        DEFAULT_KEYS.forEach((key) => {
+          if (!completedKeys.has(key)) {
+            setCardError(key, "Analysis failed.", message);
+          }
+        });
+        showToast(`Analysis failed. ${message}`, "error");
+        return;
+      }
+      if (!sawAnyKey && !attemptedFallback) {
         try {
           const data = await fetchAnalysis({
             task: trimmedTask,
@@ -395,10 +416,24 @@ const AnalyzerPage = () => {
             fallbackError instanceof Error
               ? fallbackError.message
               : "Analysis failed.";
+          DEFAULT_KEYS.forEach((key) => {
+            if (!completedKeys.has(key)) {
+              setCardError(key, "Analysis failed.", message);
+            }
+          });
           showToast(`Analysis failed. ${message}`, "error");
           return;
         }
       }
+      DEFAULT_KEYS.forEach((key) => {
+        if (!completedKeys.has(key)) {
+          setCardError(
+            key,
+            "Analysis incomplete.",
+            error instanceof Error ? error.message : "Stream ended early.",
+          );
+        }
+      });
       const message =
         error instanceof Error ? error.message : "Analysis failed.";
       showToast(`Analysis failed. ${message}`, "error");
