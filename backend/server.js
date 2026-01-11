@@ -1031,6 +1031,35 @@ function writeSseEvent(res, event, data) {
   res.flush?.();
 }
 
+function startSseSession(res) {
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+  res.write(":ok\n\n");
+
+  let closed = false;
+  const ping = setInterval(() => {
+    if (closed) return;
+    res.write(": ping\n\n");
+  }, 10000);
+
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(ping);
+  };
+
+  res.on("close", close);
+  res.on("finish", close);
+
+  return {
+    isClosed: () => closed,
+    close,
+  };
+}
+
 
 // ------------------------------
 // Routes
@@ -1141,6 +1170,7 @@ app.post("/analyze/stream", async (req, res) => {
     origin: req.headers.origin,
     hasBody: Boolean(req.body),
   });
+
   const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
   const context =
     typeof req.body?.context === "string" ? req.body.context.trim() : "";
@@ -1149,7 +1179,7 @@ app.post("/analyze/stream", async (req, res) => {
     : analysisKeys;
   const keysToAnalyze = requestedKeys.length ? requestedKeys : analysisKeys;
 
-  console.log("[route] /analyze/stream called", {
+  console.log("[stream] request payload", {
     hasTask: Boolean(task),
     hasContext: Boolean(context),
     keys: keysToAnalyze,
@@ -1166,19 +1196,7 @@ app.post("/analyze/stream", async (req, res) => {
   }
 
   const language = resolveLanguage(task);
-  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders?.();
-  res.write(":ok\n\n");
-
-  let clientGone = false;
-  const ping = setInterval(() => res.write(": ping\n\n"), 10000);
-  res.on("close", () => {
-    clientGone = true;
-    clearInterval(ping);
-  });
+  const sse = startSseSession(res);
 
   writeSseEvent(res, "status", {
     status: "started",
@@ -1188,11 +1206,14 @@ app.post("/analyze/stream", async (req, res) => {
 
   let completed = 0;
   let caseFile = createEmptyCaseFile();
+
   try {
     for (const key of keysToAnalyze) {
-      if (clientGone) {
+      if (sse.isClosed()) {
+        console.warn("[stream] client closed connection");
         return;
       }
+
       console.log(`[stream] start key=${key}`);
       writeSseEvent(res, "status", {
         status: "key-start",
@@ -1200,6 +1221,7 @@ app.post("/analyze/stream", async (req, res) => {
         completed,
         total: keysToAnalyze.length,
       });
+
       try {
         const value = await runKeyCompletion({
           key,
@@ -1208,6 +1230,7 @@ app.post("/analyze/stream", async (req, res) => {
           language,
           caseFile,
         });
+
         try {
           caseFile = await updateCaseFile(key, value, caseFile, task, context);
           if (process.env.NODE_ENV !== "production") {
@@ -1229,6 +1252,7 @@ app.post("/analyze/stream", async (req, res) => {
         } catch (summaryError) {
           console.warn(`[summary] failed for key=${key}:`, summaryError);
         }
+
         const valueWithDebug = appendDebugLine(value, caseFile);
         writeSseEvent(res, "key", {
           key,
@@ -1238,7 +1262,8 @@ app.post("/analyze/stream", async (req, res) => {
         });
         console.log(`[stream] done key=${key} ok`);
       } catch (error) {
-        if (clientGone) {
+        if (sse.isClosed()) {
+          console.warn("[stream] client closed during key processing");
           return;
         }
         const details = error?.message ? String(error.message) : String(error);
@@ -1250,7 +1275,8 @@ app.post("/analyze/stream", async (req, res) => {
         });
         console.log(`[stream] done key=${key} error=${details}`);
       } finally {
-        if (clientGone) {
+        if (sse.isClosed()) {
+          console.warn("[stream] client closed before progress update");
           return;
         }
         completed += 1;
@@ -1262,11 +1288,11 @@ app.post("/analyze/stream", async (req, res) => {
       }
     }
   } finally {
-    clearInterval(ping);
-    if (!clientGone) {
+    if (!sse.isClosed()) {
       writeSseEvent(res, "done", { status: "done" });
       res.end();
     }
+    sse.close();
   }
 });
 
