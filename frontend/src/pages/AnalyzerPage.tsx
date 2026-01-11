@@ -5,15 +5,29 @@ import {
   KEY_TITLES,
   fetchAnalysis,
   runAnalysisAction,
-  streamAnalysis,
   type AnalysisKey,
-  type AnalysisResponse,
 } from "../api/analyzeClient";
 
 const STORAGE_KEYS = {
-  task: "buddyMoving.task",
-  context: "buddyMoving.context",
-  contextUpdatedAt: "buddyMoving.contextUpdatedAt",
+  tasks: "buddyMoving.tasks",
+  legacyTask: "buddyMoving.task",
+  legacyContext: "buddyMoving.context",
+  legacyContextUpdatedAt: "buddyMoving.contextUpdatedAt",
+};
+
+type StoredAnalysisEntry = {
+  summary: string;
+  value: string;
+};
+
+type StoredTask = {
+  id: string;
+  task: string;
+  context: string;
+  createdAt: string;
+  updatedAt: string;
+  contextUpdatedAt: string | null;
+  analysis: Partial<Record<AnalysisKey, StoredAnalysisEntry>>;
 };
 
 type AnalysisEntry = {
@@ -43,6 +57,28 @@ const initState = () =>
     return acc;
   }, {} as Record<AnalysisKey, AnalysisEntry>);
 
+const createId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const getTaskPreview = (taskValue: string) => {
+  const words = taskValue.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "Untitled task";
+  return words.slice(0, 5).join(" ");
+};
+
+const formatDate = (timestamp: string | null) => {
+  if (!timestamp) return "";
+  const date = new Date(Number(timestamp));
+  if (Number.isNaN(date.valueOf())) return "";
+  return date.toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 const formatContextTimestamp = (timestamp: string | null) => {
   if (!timestamp) return "";
   const date = new Date(Number(timestamp));
@@ -59,6 +95,8 @@ const formatContextTimestamp = (timestamp: string | null) => {
 };
 
 const AnalyzerPage = () => {
+  const [tasks, setTasks] = useState<StoredTask[]>([]);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [task, setTask] = useState("");
   const [context, setContext] = useState("");
   const [contextOpen, setContextOpen] = useState(false);
@@ -70,6 +108,21 @@ const AnalyzerPage = () => {
   const toastTimeout = useRef<number | null>(null);
   const activeController = useRef<AbortController | null>(null);
   const activeStreamId = useRef(0);
+  const skipSyncRef = useRef(0);
+  const prevActiveTaskIdRef = useRef<string | null>(null);
+
+  const activeTask = useMemo(
+    () => tasks.find((entry) => entry.id === activeTaskId) ?? null,
+    [activeTaskId, tasks],
+  );
+
+  const sortedTasks = useMemo(
+    () =>
+      [...tasks].sort(
+        (a, b) => Number(b.updatedAt) - Number(a.updatedAt),
+      ),
+    [tasks],
+  );
 
   const contextIndicator = useMemo(() => {
     if (!context.trim()) {
@@ -148,33 +201,6 @@ const AnalyzerPage = () => {
     }));
   };
 
-  const applyAnalysisResponse = (data: AnalysisResponse) => {
-    const analysis =
-      data?.analysis && typeof data.analysis === "object" ? data.analysis : {};
-
-    setAnalysisState(
-      DEFAULT_KEYS.reduce<Record<AnalysisKey, AnalysisEntry>>((acc, key) => {
-        const entry = analysis[key];
-        const resolvedEntry: AnalysisEntry = {
-          summary: "",
-          value: "",
-          isExpanded: false,
-          status: "done",
-          error: null,
-          statusText: "",
-        };
-        if (typeof entry === "string") {
-          resolvedEntry.value = entry;
-        } else if (entry && typeof entry === "object") {
-          resolvedEntry.summary = entry.summary ?? "";
-          resolvedEntry.value = entry.value ?? entry.summary ?? "";
-        }
-        acc[key] = resolvedEntry;
-        return acc;
-      }, {} as Record<AnalysisKey, AnalysisEntry>),
-    );
-  };
-
   const getFullAnalysisMap = () =>
     Object.fromEntries(
       DEFAULT_KEYS.map((key) => {
@@ -182,6 +208,59 @@ const AnalyzerPage = () => {
         return [key, entry.value || entry.summary || ""];
       }),
     );
+
+  const hydrateAnalysisState = (
+    storedAnalysis?: Partial<Record<AnalysisKey, StoredAnalysisEntry>>,
+  ) => {
+    const base = initState();
+    if (!storedAnalysis) return base;
+    DEFAULT_KEYS.forEach((key) => {
+      const entry = storedAnalysis[key];
+      if (entry && (entry.summary || entry.value)) {
+        base[key] = {
+          summary: entry.summary,
+          value: entry.value,
+          isExpanded: false,
+          status: "done",
+          error: null,
+          statusText: "",
+        };
+      }
+    });
+    return base;
+  };
+
+  const persistTasks = useCallback((nextTasks: StoredTask[]) => {
+    localStorage.setItem(STORAGE_KEYS.tasks, JSON.stringify(nextTasks));
+  }, []);
+
+  const updateActiveTask = useCallback(
+    (updater: (taskEntry: StoredTask) => StoredTask) => {
+      if (!activeTaskId) return;
+      setTasks((prev) => {
+        const next = prev.map((entry) =>
+          entry.id === activeTaskId ? updater(entry) : entry,
+        );
+        return next;
+      });
+    },
+    [activeTaskId],
+  );
+
+  const handleCreateTask = () => {
+    const now = Date.now().toString();
+    const newTask: StoredTask = {
+      id: createId(),
+      task: "",
+      context: "",
+      createdAt: now,
+      updatedAt: now,
+      contextUpdatedAt: null,
+      analysis: {},
+    };
+    setTasks((prev) => [newTask, ...prev]);
+    setActiveTaskId(newTask.id);
+  };
 
   const analyzeTask = useCallback(async () => {
     const trimmedTask = task.trim();
@@ -209,77 +288,51 @@ const AnalyzerPage = () => {
     });
 
     try {
-      await streamAnalysis({
+      const response = await fetchAnalysis({
         task: trimmedTask,
         context: trimmedContext,
         signal: controller.signal,
         keys: DEFAULT_KEYS,
-        onStatus: (payload) => {
-          if (payload.status === "key-start" && payload.key) {
-            setCardLoading(payload.key, true, "Analyzing…");
-            return;
-          }
-
-          if (payload.status === "started") {
-            const total =
-              typeof payload.total === "number"
-                ? payload.total
-                : DEFAULT_KEYS.length;
-            updateProgress(payload.completed ?? 0, total);
-            return;
-          }
-
-          if (payload.status === "progress") {
-            updateProgress(payload.completed, payload.total ?? DEFAULT_KEYS.length);
-          }
-        },
-        onKey: (payload) => {
-          const summaryValue = payload.summary ?? "";
-          const valueValue = payload.value ?? payload.summary ?? "";
-          updateAnalysisKey(payload.key, summaryValue, valueValue);
-        },
-        onError: (payload) => {
-          if (payload.key) {
-            setCardError(
-              payload.key,
-              payload.error || "Failed to generate.",
-              payload.details,
-            );
-          } else if (payload.error) {
-            showToast(payload.error, "error");
-          }
-        },
       });
+
+      const analysis = response.analysis ?? {};
+      let sawAnyKey = false;
+
+      DEFAULT_KEYS.forEach((key) => {
+        const entry = analysis[key];
+        if (typeof entry === "string") {
+          updateAnalysisKey(key, entry, entry);
+          sawAnyKey = true;
+          return;
+        }
+        if (entry && typeof entry === "object") {
+          const summaryValue =
+            typeof entry.summary === "string" ? entry.summary : "";
+          const valueValue =
+            typeof entry.value === "string" ? entry.value : summaryValue;
+          updateAnalysisKey(key, summaryValue, valueValue);
+          if (summaryValue || valueValue) {
+            sawAnyKey = true;
+          }
+          return;
+        }
+        setCardError(key, "Analysis failed.", "No analysis received.");
+      });
+
+      if (!sawAnyKey) {
+        showToast("Analysis failed. No results received.", "error");
+        return;
+      }
       showToast("Analysis complete.");
     } catch (error) {
       if (controller.signal.aborted) {
         return;
       }
-      if (
-        error instanceof Error &&
-        error.message.includes("Streaming is not supported")
-      ) {
-        try {
-          const data = await fetchAnalysis({
-            task: trimmedTask,
-            context: trimmedContext,
-            keys: DEFAULT_KEYS,
-            signal: controller.signal,
-          });
-          applyAnalysisResponse(data);
-          showToast("Analysis complete.");
-          return;
-        } catch (fallbackError) {
-          const message =
-            fallbackError instanceof Error
-              ? fallbackError.message
-              : "Analysis failed.";
-          showToast(`Analysis failed. ${message}`, "error");
-          return;
-        }
-      }
       const message =
         error instanceof Error ? error.message : "Analysis failed.";
+      DEFAULT_KEYS.forEach((key) => {
+        setCardError(key, "Analysis failed.", message);
+      });
       showToast(`Analysis failed. ${message}`, "error");
     } finally {
       if (activeStreamId.current === requestId) {
@@ -344,28 +397,47 @@ const AnalyzerPage = () => {
   };
 
   useEffect(() => {
-    const savedTask = localStorage.getItem(STORAGE_KEYS.task);
-    const savedContext = localStorage.getItem(STORAGE_KEYS.context);
-    const savedContextUpdatedAt = localStorage.getItem(
-      STORAGE_KEYS.contextUpdatedAt,
-    );
+    const storedTasks = localStorage.getItem(STORAGE_KEYS.tasks);
+    let parsedTasks: StoredTask[] = [];
+    if (storedTasks) {
+      try {
+        const parsed = JSON.parse(storedTasks);
+        if (Array.isArray(parsed)) {
+          parsedTasks = parsed.filter(
+            (entry): entry is StoredTask =>
+              entry &&
+              typeof entry === "object" &&
+              typeof entry.id === "string",
+          );
+        }
+      } catch {
+        parsedTasks = [];
+      }
+    }
 
-    if (savedTask) {
-      setTask(savedTask);
+    if (parsedTasks.length === 0) {
+      const savedTask = localStorage.getItem(STORAGE_KEYS.legacyTask);
+      const savedContext = localStorage.getItem(STORAGE_KEYS.legacyContext);
+      const savedContextUpdatedAt = localStorage.getItem(
+        STORAGE_KEYS.legacyContextUpdatedAt,
+      );
+      if (savedTask || savedContext) {
+        const now = Date.now().toString();
+        parsedTasks = [
+          {
+            id: createId(),
+            task: savedTask ?? "",
+            context: savedContext ?? "",
+            createdAt: now,
+            updatedAt: now,
+            contextUpdatedAt: savedContextUpdatedAt ?? now,
+            analysis: {},
+          },
+        ];
+      }
     }
-    if (savedContext) {
-      setContext(savedContext);
-    }
-    if (savedContext && !savedContextUpdatedAt) {
-      const now = Date.now().toString();
-      localStorage.setItem(STORAGE_KEYS.contextUpdatedAt, now);
-      setContextUpdatedAt(now);
-    } else if (savedContextUpdatedAt) {
-      setContextUpdatedAt(savedContextUpdatedAt);
-    }
-    if (savedContext) {
-      setContextOpen(true);
-    }
+
+    setTasks(parsedTasks);
 
     return () => {
       if (activeController.current) {
@@ -378,15 +450,92 @@ const AnalyzerPage = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.task, task);
-  }, [task]);
+    persistTasks(tasks);
+  }, [persistTasks, tasks]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.context, context);
+    const isSwitchingTask = prevActiveTaskIdRef.current !== activeTaskId;
+    prevActiveTaskIdRef.current = activeTaskId;
+
+    if (!activeTaskId) {
+      setTask("");
+      setContext("");
+      setContextUpdatedAt(null);
+      setContextOpen(false);
+      setAnalysisState(initState());
+      setIsAnalyzing(false);
+      setStatusText("Analyzing…");
+      return;
+    }
+
+    if (activeController.current) {
+      activeController.current.abort();
+    }
+    setIsAnalyzing(false);
+    setStatusText("Analyzing…");
+
+    if (activeTask && isSwitchingTask) {
+      skipSyncRef.current = 3;
+      setTask(activeTask.task);
+      setContext(activeTask.context);
+      setContextUpdatedAt(activeTask.contextUpdatedAt);
+      setContextOpen(Boolean(activeTask.context.trim()));
+      setAnalysisState(hydrateAnalysisState(activeTask.analysis));
+    }
+  }, [activeTask, activeTaskId]);
+
+  useEffect(() => {
+    if (!activeTaskId) return;
+    if (skipSyncRef.current > 0) {
+      skipSyncRef.current -= 1;
+      return;
+    }
+    const now = Date.now().toString();
+    updateActiveTask((entry) => ({
+      ...entry,
+      task,
+      updatedAt: now,
+    }));
+  }, [activeTaskId, task, updateActiveTask]);
+
+  useEffect(() => {
+    if (!activeTaskId) return;
+    if (skipSyncRef.current > 0) {
+      skipSyncRef.current -= 1;
+      return;
+    }
     const updatedAt = Date.now().toString();
-    localStorage.setItem(STORAGE_KEYS.contextUpdatedAt, updatedAt);
     setContextUpdatedAt(updatedAt);
-  }, [context]);
+    updateActiveTask((entry) => ({
+      ...entry,
+      context,
+      contextUpdatedAt: updatedAt,
+      updatedAt,
+    }));
+  }, [activeTaskId, context, updateActiveTask]);
+
+  useEffect(() => {
+    if (!activeTaskId) return;
+    if (skipSyncRef.current > 0) {
+      skipSyncRef.current -= 1;
+      return;
+    }
+    const updatedAt = Date.now().toString();
+    const analysisSnapshot = DEFAULT_KEYS.reduce<
+      Partial<Record<AnalysisKey, StoredAnalysisEntry>>
+    >((acc, key) => {
+      const entry = analysisState[key];
+      if (entry.summary || entry.value) {
+        acc[key] = { summary: entry.summary, value: entry.value };
+      }
+      return acc;
+    }, {});
+    updateActiveTask((entry) => ({
+      ...entry,
+      analysis: analysisSnapshot,
+      updatedAt,
+    }));
+  }, [activeTaskId, analysisState, updateActiveTask]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -405,8 +554,77 @@ const AnalyzerPage = () => {
     };
   }, [analyzeTask]);
 
+  if (!activeTaskId) {
+    return (
+      <section className="task-list">
+        <div className="task-list-header">
+          <div>
+            <p className="task-list-title">Tasks</p>
+            <p className="task-list-subtitle">
+              Pick a task to analyze or start a new one.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="analysis-primary"
+            onClick={handleCreateTask}
+          >
+            New task
+          </button>
+        </div>
+        <div className="task-list-body">
+          {sortedTasks.length ? (
+            <div className="task-list-grid">
+              {sortedTasks.map((entry) => (
+                <button
+                  type="button"
+                  className="task-list-item"
+                  key={entry.id}
+                  onClick={() => setActiveTaskId(entry.id)}
+                >
+                  <div className="task-list-item-main">
+                    <span className="task-list-item-title">
+                      {getTaskPreview(entry.task)}
+                    </span>
+                    <span className="task-list-item-meta">
+                      Created {formatDate(entry.createdAt)}
+                    </span>
+                  </div>
+                  <span className="task-list-item-action">Open</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="task-list-empty">
+              <p>No tasks yet.</p>
+              <button
+                type="button"
+                className="button"
+                onClick={handleCreateTask}
+              >
+                Create your first task
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="analysis-app">
+      <div className="analysis-toolbar">
+        <button
+          type="button"
+          className="analysis-back"
+          onClick={() => setActiveTaskId(null)}
+        >
+          ← Back to tasks
+        </button>
+        <div className="analysis-task-meta">
+          Created {formatDate(activeTask?.createdAt ?? null)}
+        </div>
+      </div>
       <div className="analysis-layout">
         <div className="analysis-left">
           <label className="analysis-field">

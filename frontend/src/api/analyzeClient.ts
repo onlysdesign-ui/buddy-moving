@@ -191,7 +191,9 @@ export const streamAnalysis = async ({
       return;
     }
     if (!sawDone) {
-      onError?.({ error: "Stream ended early. Analysis marked complete." });
+      const err = new Error("Stream ended early (no done event).");
+      onError?.({ error: err.message });
+      streamError = streamError ?? err;
     }
   }
 

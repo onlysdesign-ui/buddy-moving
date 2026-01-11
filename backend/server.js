@@ -8,7 +8,7 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4o-mini";
-const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 30000;
+const OPENAI_TIMEOUT_MS = Number(process.env.OPENAI_TIMEOUT_MS) || 60000;
 const STRICT_MODE = process.env.STRICT_MODE === "true";
 const OPENAI_TEMPERATURE = Number(process.env.OPENAI_TEMPERATURE ?? 0.45);
 const TOKENS_DEEPER = Number(process.env.TOKENS_DEEPER ?? 1100);
@@ -24,6 +24,11 @@ const {
 
 const app = express();
 const port = process.env.PORT || 3000;
+const TEST_CASES_PATH = path.join(__dirname, "data", "testcases.json");
+const FALLBACK_TEST_CASES_PATH = path.join(
+  __dirname,
+  "../frontend/src/tests/eval_cases_v2.json"
+);
 
 console.log("OPENAI_API_KEY:", OPENAI_API_KEY ? "set" : "missing");
 console.log("OPENAI_MODEL:", OPENAI_MODEL);
@@ -37,10 +42,18 @@ console.log("TOKENS_VERIFY:", TOKENS_VERIFY);
 // ------------------------------
 
 // Разрешаем твой GitHub Pages + локальную разработку
-const ALLOWED_ORIGINS = new Set([
+const DEFAULT_ALLOWED_ORIGINS = [
   "https://onlysdesign-ui.github.io",
   "http://localhost:3000",
   "http://localhost:5173",
+];
+const extraAllowedOrigins = (process.env.EXTRA_ALLOWED_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const ALLOWED_ORIGINS = new Set([
+  ...DEFAULT_ALLOWED_ORIGINS,
+  ...extraAllowedOrigins,
 ]);
 
 app.use((req, res, next) => {
@@ -53,7 +66,10 @@ app.use((req, res, next) => {
 
   // Разрешаем нужные методы и заголовки
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader(
+    "Access-Control-Allow-Headers",
+    "Content-Type, Authorization, Accept"
+  );
 
   // Если вдруг в будущем понадобится куки - можно включить:
   // res.setHeader("Access-Control-Allow-Credentials", "true");
@@ -70,6 +86,38 @@ app.use((req, res, next) => {
 // Middleware
 // ------------------------------
 app.use(express.json());
+
+// ------------------------------
+// Test cases storage
+// ------------------------------
+const ensureTestCasesFile = () => {
+  if (fs.existsSync(TEST_CASES_PATH)) {
+    return;
+  }
+  fs.mkdirSync(path.dirname(TEST_CASES_PATH), { recursive: true });
+  if (fs.existsSync(FALLBACK_TEST_CASES_PATH)) {
+    fs.copyFileSync(FALLBACK_TEST_CASES_PATH, TEST_CASES_PATH);
+    return;
+  }
+  fs.writeFileSync(TEST_CASES_PATH, "[]");
+};
+
+const readTestCases = () => {
+  try {
+    ensureTestCasesFile();
+    const raw = fs.readFileSync(TEST_CASES_PATH, "utf8");
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn("[testcases] failed to read cases:", error);
+    return [];
+  }
+};
+
+const writeTestCases = (testCases) => {
+  ensureTestCasesFile();
+  fs.writeFileSync(TEST_CASES_PATH, JSON.stringify(testCases, null, 2));
+};
 
 // ------------------------------
 // Static dist fallback (optional)
@@ -102,18 +150,20 @@ const keyInstructions = {
   framing: [
     "Card: Framing",
     "Purpose:",
-    "- Reframe the task into a clear problem statement and constraints without proposing solutions.",
-    "- If funnel metrics are provided, diagnose where the biggest drop-offs are before proposing any direction.",
+    "- Reframe the task into a clear problem statement and constraints without proposing solutions or directions.",
+    "- If funnel metrics are provided, diagnose where the biggest drop-offs are before any direction-setting.",
     "Input dependencies:",
     "- Task + Context + existing Case File (may update task_summary).",
     "Output format (strict):",
     "### Problem statement",
-    "- <1-2 sentences without solution>",
+    "- <1-2 sentences describing the problem, no solution implied>",
     "",
     "### Desired outcome",
-    "- <result needed, not how>",
+    "- <result needed, not how to achieve it>",
     "",
-    "### Funnel diagnosis (use provided data)",
+    "### Funnel diagnosis",
+    "- If funnel/metrics exist in TASK/CONTEXT/CASE FILE, reference them verbatim.",
+    "- If no funnel is given, define a minimal funnel as an assumption (Stage A/B/C) using plain names that fit the case.",
     "- Biggest drop-offs:",
     "  - <stage A → B>: <what happens>",
     "  - <stage B → C>: <what happens>",
@@ -132,190 +182,226 @@ const keyInstructions = {
     "- Business:",
     "  - <if not specified: Not specified>",
     "- Product:",
-    "  - ...",
+    "  - <if not specified: Not specified>",
     "- Tech:",
-    "  - ...",
+    "  - <if not specified: Not specified>",
     "- Compliance / legal:",
-    "  - ...",
+    "  - <if not specified: Not specified>",
     "",
-    "### Assumptions (if not specified)",
+    "### Assumptions (required if info is missing)",
     "- Assumption (confidence: high/medium/low): ...",
     "  - Impact if wrong: ...",
-    "  - How to validate quickly: ...",
+    "  - How to validate quickly (no invented sample sizes/timelines): ...",
     "",
     "Quality rules:",
-    "- No solutions.",
-    "- Do not invent constraints.",
-    "- Funnel diagnosis must reference provided numbers if present.",
+    "- No solutions, no recommended directions.",
+    "- Do not invent constraints, stakeholders, or facts.",
+    "- Funnel diagnosis must use provided numbers if present; otherwise keep it qualitative and explicitly assumed.",
     "- Assumptions must be 3–6, not more.",
     "- Max ~20 bullets total across sections.",
     "- No bullet should run longer than 3 lines.",
   ].join("\n"),
 
   unknowns: [
-  "Card: Unknowns & Questions",
-  "Purpose:",
-  "- Surface blind spots and prioritize unknowns that block a decision.",
-  "- Unknowns must be tied to a specific funnel stage when funnel data exists.",
-  "Input dependencies:",
-  "- Uses framing + constraints + assumptions from Case File.",
-  "Output format (strict):",
-  "### Blocking unknowns (top 3)",
-  "- Unknown (stage: <A → B>): ...",
-  "  - Why it matters: ...",
-  "  - Fastest way to validate (no-user-contact first): ...",
-  "",
-  "### High-impact unknowns",
-  "- Unknown (stage: <A → B>): ...",
-  "  - Why it matters: ...",
-  "  - Fastest way to validate: ...",
-  "",
-  "### Cheap-to-answer (data / logs / quick prototype)",
-  "- Unknown (stage: <A → B>): ...",
-  "  - Fastest way to validate: ...",
-  "",
-  "### Expensive-to-answer (research heavy)",
-  "- Unknown (stage: <A → B>): ...",
-  "  - Fastest way to validate: ...",
-  "",
-  "### Red flags (if any)",
-  "- Red flag: ...",
-  "  - Why it matters: ...",
-  "  - How to detect early: ...",
-  "",
-  "Quality rules:",
-  "- Keep list concise; avoid long question lists.",
-  "- Every unknown must include fastest way to validate.",
-  "- Prefer validation via existing analytics/logs/recordings before interviews.",
-  "- Do not address the user directly.",
-  "- Max 10 unknowns total across sections.",
-  "- No bullet should run longer than 3 lines.",
-].join("\n"),
+    "Card: Unknowns & Questions",
+    "Purpose:",
+    "- Surface blind spots and prioritize unknowns that block a decision.",
+    "- Unknowns must be tied to a specific funnel stage when funnel data exists (or assumed funnel if none exists).",
+    "Input dependencies:",
+    "- Uses framing + constraints + assumptions from Case File.",
+    "Output format (strict):",
+    "### Blocking unknowns (top 3)",
+    "- Unknown: ... (stage: <A → B>)",
+    "  - Why it matters: ...",
+    "  - Fastest way to validate (prefer no-user-contact first): ...",
+    "",
+    "### High-impact unknowns",
+    "- Unknown: ... (stage: <A → B>)",
+    "  - Why it matters: ...",
+    "  - Fastest way to validate: ...",
+    "",
+    "### Cheap-to-answer (data / logs / quick prototype)",
+    "- Unknown: ... (stage: <A → B>)",
+    "  - Fastest way to validate: ...",
+    "",
+    "### Expensive-to-answer (research heavy)",
+    "- Unknown: ... (stage: <A → B>)",
+    "  - Fastest way to validate: ...",
+    "",
+    "### Red flags (if any)",
+    "- Red flag: ...",
+    "  - Why it matters: ...",
+    "  - How to detect early: ...",
+    "",
+    "Quality rules:",
+    "- Keep list concise; avoid long question lists.",
+    "- Every unknown must include a fastest validation method.",
+    "- Prefer validation via existing artifacts (analytics/logs/support/ops docs) before interviews when possible.",
+    "- Do not propose numeric sample sizes (avoid '5–10 users').",
+    "- Do not address the reader directly and do not ask questions.",
+    "- Max 10 unknowns total across sections.",
+    "- No bullet should run longer than 3 lines.",
+  ].join("\n"),
 
   solution_space: [
-  "Card: Solution space",
-  "Purpose:",
-  "- Provide 3–7 distinct strategic directions (not UI variants).",
-  "- At least one direction MUST focus on activation (purchase → first workout).",
-  "- At least one direction MUST focus on habit formation (first workout → 3 workouts/7 days).",
-  "- Paywall-only directions are allowed but cannot dominate unless funnel diagnosis shows paywall is the single biggest bottleneck.",
-  "Input dependencies:",
-  "- Uses framing + unknowns from Case File.",
-  "Output format (strict):",
-  "### Directions (3–7)",
-  "#### A) <name>",
-  "- What it is: <1 line>",
-  "- Funnel stage targeted:",
-  "  - <e.g., paywall view → purchase>",
-  "- Why it might work:",
-  "  - ...",
-  "- Must be true:",
-  "  - ...",
-  "- Trade-offs:",
-  "  - ...",
-  "- What to test first (fast):",
-  "  - ...",
-  "",
-  "(repeat for B/C/D...)",
-  "Quality rules:",
-  "- Directions must be materially different.",
-  "- Each direction must cite at least one unknown/assumption it resolves.",
-  "- Max 5 directions.",
-  "- Do NOT propose 'free full access' if constraints forbid it.",
-  "- No bullet should run longer than 3 lines.",
-].join("\n"),
+    "Card: Solution space",
+    "Purpose:",
+    "- Provide distinct strategic directions (not UI variants) that could address the primary leverage point.",
+    "- Treat any suggested solution in the task as a hypothesis and include credible alternatives.",
+    "Input dependencies:",
+    "- Uses framing + unknowns from Case File.",
+    "Output format (strict):",
+    "### Directions (exactly 4)",
+    "#### A) <name>",
+    "- What it is: <1 line>",
+    "- Funnel stage targeted:",
+    "  - <e.g., stage A → B>",
+    "- Unknowns/assumptions it addresses:",
+    "  - <cite at least 1 from the Case File>",
+    "- Why it might work:",
+    "  - ...",
+    "- Trade-offs:",
+    "  - ...",
+    "- What to test first (fast, realistic, no invented numbers):",
+    "  - ...",
+    "",
+    "#### B) <name>",
+    "- What it is: <1 line>",
+    "- Funnel stage targeted:",
+    "  - ...",
+    "- Unknowns/assumptions it addresses:",
+    "  - ...",
+    "- Why it might work:",
+    "  - ...",
+    "- Trade-offs:",
+    "  - ...",
+    "- What to test first (fast, realistic, no invented numbers):",
+    "  - ...",
+    "",
+    "#### C) <name>",
+    "- What it is: <1 line>",
+    "- Funnel stage targeted:",
+    "  - ...",
+    "- Unknowns/assumptions it addresses:",
+    "  - ...",
+    "- Why it might work:",
+    "  - ...",
+    "- Trade-offs:",
+    "  - ...",
+    "- What to test first (fast, realistic, no invented numbers):",
+    "  - ...",
+    "",
+    "#### D) <name>",
+    "- What it is: <1 line>",
+    "- Funnel stage targeted:",
+    "  - ...",
+    "- Unknowns/assumptions it addresses:",
+    "  - ...",
+    "- Why it might work:",
+    "  - ...",
+    "- Trade-offs:",
+    "  - ...",
+    "- What to test first (fast, realistic, no invented numbers):",
+    "  - ...",
+    "",
+    "Quality rules:",
+    "- Directions must be materially different (strategy/process/tooling/ops), not cosmetic variants.",
+    "- Include at least one direction that challenges the task’s suggested solution.",
+    "- Each direction must tie to at least one unknown/assumption from the Case File.",
+    "- Do not propose anything that violates stated constraints; if unsure, mark as Assumption with low confidence.",
+    "- No bullet should run longer than 3 lines.",
+  ].join("\n"),
 
   decision: [
-  "Card: Decision",
-  "Purpose:",
-  "- Recommend one direction based on learnability, not taste.",
-  "- Do NOT default to the proposed solution from the task; treat it as a hypothesis.",
-  "Input dependencies:",
-  "- Uses solution_space + unknowns + framing from Case File.",
-  "Output format (strict):",
-  "### Why this direction (internal scoring)",
-  "Note: This is internal scoring used to compare options, not a user-facing output.",
-  "- Validation speed: <High/Medium/Low> (how fast we can learn)",
-  "- Expected impact: <High/Medium/Low> (ties to leverage point)",
-  "- Risk reduction: <High/Medium/Low> (reduces biggest unknowns)",
-  "- Complexity/cost: <High/Medium/Low> (2-week feasibility)",
-  "",
-  "### What this means",
-  "- <1–2 bullets: why this direction wins based on the scoring>",
-  "",
-  "### Recommended direction",
-  "- Pick: <A/B/C/...>",
-  "- Why (tie to funnel diagnosis + unknowns + expected learning):",
-  "  - ...",
-  "- Key trade-offs:",
-  "  - ...",
-  "",
-  "### Backup direction",
-  "- Pick: <A/B/C/...>",
-  "- Why:",
-  "  - ...",
-  "",
-  "### First checks (24–72h)",
-  "- <2–4 checks that reduce the biggest unknowns>",
-  "",
-  "Quality rules:",
-  "- The pick must exist in solution_space.",
-  "- One primary + one backup only.",
-  "- First checks must reduce unknowns, not 'just ship and see'.",
-  "- If task text contains a proposed solution, explicitly say why it's NOT chosen or what would make you choose it.",
-  "- Max 8 bullets total across sections.",
-  "- No bullet should run longer than 3 lines.",
-].join("\n"),
+    "Card: Decision",
+    "Purpose:",
+    "- Recommend one direction based on fastest learning that de-risks the biggest unknowns, not taste.",
+    "- Do NOT default to the proposed solution from the task; treat it as a hypothesis.",
+    "Input dependencies:",
+    "- Uses solution_space + unknowns + framing from Case File.",
+    "Output format (strict):",
+    "### Recommended direction",
+    "- Pick: <A/B/C/D>",
+    "",
+    "### Rationale (tie to funnel + unknowns + learnability)",
+    "- <2–5 bullets explaining why this direction best targets the leverage point and reduces key unknowns>",
+    "",
+    "### Why not the other directions yet",
+    "- <1–3 bullets: what is currently unproven/too risky/too slow for each non-chosen option>",
+    "",
+    "### Backup direction",
+    "- Pick: <A/B/C/D> (must differ from recommended)",
+    "- Why this is the best fallback:",
+    "  - ...",
+    "",
+    "### First checks (fast)",
+    "- <2–4 checks that reduce the biggest unknowns (no invented timelines)>",
+    "",
+    "Quality rules:",
+    "- The pick must exist in solution_space.",
+    "- One primary + one backup only.",
+    "- Avoid template filler (do not output standalone scoring like 'Validation speed: Medium').",
+    "- First checks must reduce unknowns; do not propose 'ship and see'.",
+    "- If task text contains a proposed solution, state what would need to be true to choose it (or why it is deferred).",
+    "- Max ~12 bullets total across sections.",
+    "- No bullet should run longer than 3 lines.",
+  ].join("\n"),
+
   experiment_plan: [
-  "Card: Experiment plan",
-  "Purpose:",
-  "- Translate the decision into validation + measurement without invented numbers.",
-  "Input dependencies:",
-  "- Uses decision + unknowns + framing from Case File.",
-  "Output format (strict):",
-  "### Fastest test (smoke / fake door)",
-  "- Goal:",
-  "- Setup:",
-  "- What we measure:",
-  "- Pass/fail signal (qualitative unless user provided targets):",
-  "  - <e.g., 'meaningful lift vs baseline' OR reference provided targets only>",
-  "",
-  "### Prototype usability test",
-  "- Goal:",
-  "- Participants:",
-  "- Script (3–5 steps):",
-  "- What we measure:",
-  "",
-  "### A/B test (if applicable)",
-  "- Hypothesis:",
-  "- Variants:",
-  "- Primary metric:",
-  "- Guardrails:",
-  "- Duration: Not specified (depends on traffic)",
-  "",
-  "### Metrics definitions (use provided targets if given)",
-  "- Leading:",
-  "  - <metric> - How to measure:",
-  "- Outcome:",
-  "  - ...",
-  "- Guardrails:",
-  "  - ...",
-  "",
-  "### Instrumentation / tracking needed",
-  "- <events + key properties + where in the funnel>",
-  "",
-  "Quality rules:",
-  "- Do not invent targets, thresholds, sample sizes, or timelines.",
-  "- If user provided targets (e.g., +20%), you may reference them.",
-  "- Each test must tie back to unknowns AND the primary leverage point.",
-  "- Max 12 bullets total across sections.",
-  "- No bullet should run longer than 3 lines.",
-].join("\n"),
+    "Card: Experiment plan",
+    "Purpose:",
+    "- Translate the decision into validation + measurement without invented numbers.",
+    "- Choose tests that fit the scenario (do not default to landing pages unless a digital acquisition surface is clearly implied).",
+    "Input dependencies:",
+    "- Uses decision + unknowns + framing from Case File.",
+    "Output format (strict):",
+    "### Fastest validation (smoke / dry run / paper test)",
+    "- Goal:",
+    "- Setup:",
+    "- What we measure:",
+    "- Pass/fail signal (qualitative unless user provided targets):",
+    "  - <e.g., 'meaningful lift vs baseline' OR reference provided targets only>",
+    "",
+    "### Prototype usability test",
+    "- Goal:",
+    "- Participants:",
+    "- Script (3–5 steps):",
+    "- What we measure:",
+    "",
+    "### A/B test (only if applicable)",
+    "- Hypothesis:",
+    "- Variants:",
+    "- Primary metric:",
+    "- Guardrails:",
+    "- Duration: Not specified",
+    "",
+    "### Metrics definitions (use provided targets if given)",
+    "- Leading:",
+    "  - <metric> - How to measure:",
+    "- Outcome:",
+    "  - <metric> - How to measure:",
+    "- Guardrails:",
+    "  - <metric> - How to measure:",
+    "",
+    "### Instrumentation / tracking needed",
+    "- Event: <name>",
+    "  - When fired:",
+    "  - Properties:",
+    "",
+    "Quality rules:",
+    "- Do not invent targets, thresholds, sample sizes, or timelines.",
+    "- If user provided targets (e.g., +20%), you may reference them verbatim.",
+    "- Each test must tie back to the biggest unknowns AND the primary leverage point.",
+    "- If A/B is not applicable, state 'Not applicable' and provide the closest credible alternative comparison.",
+    "- Keep instrumentation concrete and minimal; no invented business KPIs.",
+    "- Max ~14 bullets total across sections.",
+    "- No bullet should run longer than 3 lines.",
+  ].join("\n"),
 
   work_package: [
     "Card: Work package",
     "Purpose:",
-    "- Provide concrete design/development artifacts tied to the chosen direction.",
+    "- Provide concrete design/development artifacts tied to the chosen direction and experiment plan.",
     "Input dependencies:",
     "- Uses decision + experiment_plan from Case File.",
     "Output format (strict):",
@@ -323,7 +409,7 @@ const keyInstructions = {
     "- Step 1:",
     "- Step 2:",
     "",
-    "### Acceptance criteria (must be testable)",
+    "### Acceptance criteria (must be testable, no invented numeric targets)",
     "- ...",
     "",
     "### Edge cases",
@@ -346,9 +432,9 @@ const keyInstructions = {
     "  - ...",
     "",
     "Quality rules:",
-    "- Everything must align to the recommended direction.",
-    "- Acceptance criteria must be testable.",
-    "- Prototype outline must stay focused.",
+    "- Everything must align to the recommended direction and planned tests.",
+    "- Acceptance criteria must be binary/testable (avoid invented % goals, time limits, or recall targets).",
+    "- Prototype outline must stay focused on what is needed to run the experiment.",
     "Assumptions policy:",
     "- If you introduce new entities, mark them as assumptions.",
     "- Max 12 bullets total across sections.",
@@ -392,34 +478,41 @@ function buildKeyPrompt({ key, task, context, language, caseFile }) {
   const languageLabel = languageLabels[language] || "English";
   const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
   return [
-    "You are a senior product designer + product thinker.",
+    "You are a senior product designer + product owner-level product thinker.",
     `Respond only for the "${key}" card.`,
     `Write in ${languageLabel}.`,
     "You must follow the Output format exactly.",
     "Respond with plain text only. Use markdown headings '###'. No JSON.",
-    "Do not use direct questions addressed to the user (no 'you'). Write unknowns as statements: 'Unknown: ...'.",
-    "Do not invent deadlines, budgets, or KPIs. If missing, use 'Not specified' or 'Assumption: ... (confidence: low)'.",
-    "Avoid fluff. Every bullet must be checkable or directly useful for execution.",
-    "Keep sections short with scannable bullets. Avoid deep nesting.",
-    "All artifacts must be copy-pastable into a ticket.",
-    "Every output must include at least one explicit assumption (more if data is missing).",
-    "Do not introduce new stakeholders/entities unless necessary; if you do, mark as Assumption.",
-    "Use the Case File as the single source of truth for subsequent cards.",
-    "Stay consistent with earlier cards; update only if the key allows it.",
-    
-    "Funnel-first rule:",
-    "- If the task includes funnel/metrics, you MUST use them explicitly.",
-    "- Identify the biggest drop-offs and name them (stage A→B).",
-    "- Do NOT tunnel on the proposed solution. Treat it as a hypothesis unless proven.",
     "",
-    "Anti-tunnel rule:",
-    "- If the task text suggests a solution (e.g., 'move paywall earlier'), you MUST list at least 2 alternative directions that challenge it.",
-    "- Recommended direction must be justified by funnel diagnosis + fastest learning.",
+    "Core rules (strict):",
+    "- No-direct-user rule: do not address the reader directly (avoid 'you') and do not ask questions.",
+    "- Unknowns must be written as statements starting with 'Unknown:'.",
+    "- Assumptions must start with 'Assumption:' and include confidence when the format asks for it.",
+    "- Source of truth: use only TASK + CONTEXT + CASE FILE. Do not invent missing facts.",
+    "- Avoid fluff. Every bullet must be checkable and copy-pastable into a ticket.",
+    "- Keep sections short with scannable bullets. Avoid deep nesting and long multi-line bullets.",
     "",
     "Numbers rule (strict):",
-    "- You may ONLY use numeric thresholds/targets if the user provided them.",
+    "- You may ONLY use numeric thresholds/targets if the user provided them in TASK/CONTEXT/CASE FILE.",
     "- Never invent pass/fail thresholds, % deltas, sample sizes, or timelines.",
+    "- Avoid numeric ranges entirely (examples to avoid: '24–72h', '5–10 users', '90%', '30 minutes', '+15%').",
     "- If a pass/fail signal is required, define it qualitatively (e.g., 'meaningful lift vs baseline').",
+    "",
+    "Funnel-first rule:",
+    "- If the task includes funnel/metrics, you MUST use them explicitly and name the biggest drop-offs (stage A → B).",
+    "- If no funnel is provided, define a minimal funnel (Stage A/B/C) as an assumption and keep it consistent.",
+    "- Do NOT tunnel on a proposed solution. Treat it as a hypothesis unless proven.",
+    "",
+    "Anti-tunnel rule:",
+    "- If the task text suggests a solution, you MUST present credible alternative directions before selecting.",
+    "- Recommended direction must be justified by funnel diagnosis + fastest learning + unknown reduction.",
+    "",
+    "Experiment realism rule:",
+    "- Do not default to landing pages/fake doors unless a digital acquisition surface is clearly implied in the case.",
+    "",
+    "Consistency rule:",
+    "- Use the Case File as the single source of truth across subsequent cards.",
+    "- Stay consistent with earlier cards; update only if the key explicitly allows it.",
     "",
     "TASK:",
     task,
@@ -614,7 +707,7 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
               {
                 role: "system",
                 content:
-                  "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  "Respond with plain text only. Use markdown headings '###'. No JSON. Do not ask questions. Do not invent numbers.",
               },
               { role: "user", content: prompt },
             ],
@@ -649,7 +742,7 @@ async function runKeyCompletion({ key, task, context, language, caseFile, signal
 function buildSummaryPrompt({ key, language, fullValue, strictAntiCopy = false }) {
   const languageLabel = languageLabels[language] || "English";
   return [
-    "You are a senior product designer + product thinker.",
+    "You are a senior product designer + product owner-level product thinker.",
     `Summarize the "${key}" card into a dense, decision-grade digest.`,
     `Write in ${languageLabel}.`,
     "Summary rules (strict):",
@@ -661,9 +754,9 @@ function buildSummaryPrompt({ key, language, fullValue, strictAntiCopy = false }
     "- Inside a block use short sentences or compact bullets; avoid long multi-line items.",
     "- Do not mirror the structure of the full output or reuse its headings.",
     "- Include: what matters, why it matters, and what to do next.",
-    "- Use concrete details from the full output (numbers, funnel stages, specific unknowns, decision, tests).",
-    "- No new metrics, directions, tests, KPIs, stakeholders, or goals.",
-    "- No filler like 'analyze data' or 'find reasons'—replace with specific actions already in the full output.",
+    "- Use concrete details from the full output (funnel stages, specific unknowns, decision, tests).",
+    "- No new metrics, directions, tests, stakeholders, goals, sample sizes, or timelines.",
+    "- No filler like 'analyze data'—replace with specific actions already in the full output.",
     "- Never invent numbers. If numbers appear, copy them verbatim from the full output.",
     "- No standalone questions; unknowns must be statements.",
     "- Do not repeat a block. Do not start over. Only one digest.",
@@ -691,7 +784,7 @@ async function runSummary({ key, language, fullValue, signal, strictAntiCopy }) 
           messages: [
             {
               role: "system",
-              content: "Return only the summary in plain text.",
+              content: "Return only the summary in plain text. Do not invent numbers or new facts.",
             },
             { role: "user", content: prompt },
           ],
@@ -765,13 +858,14 @@ async function runDeeper({
   const otherContext = buildContextSummary(currentAnalysis, key);
   const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
   const prompt = [
-    "You are a senior product designer + product thinker.",
+    "You are a senior product designer + product owner-level product thinker.",
     `Write a deeper, more detailed version of the "${key}" card.`,
     `Write in ${languageLabels[language] || "English"}.`,
     "Follow the Output format exactly.",
     "Respond with plain text only. Use markdown headings '###'. No JSON.",
-    "Do not ask the user questions. Use only: 'We need to confirm:', 'Unknown:', or 'Assumption:' if needed.",
-    "Do not invent deadlines, budgets, or KPIs. If missing, use 'Not specified' or 'Assumption: ... (confidence: low)'.",
+    "No-direct-user rule: do not address the reader directly (avoid 'you') and do not ask questions.",
+    "Unknowns must start with 'Unknown:' and assumptions with 'Assumption:'.",
+    "Numbers rule (strict): do not invent targets, thresholds, sample sizes, or timelines.",
     "Avoid fluff. Every bullet must be checkable or directly useful for execution.",
     "Keep sections short with scannable bullets (no bullet longer than 3 lines). Avoid deep nesting.",
     "Every output must include at least one explicit assumption.",
@@ -811,7 +905,7 @@ async function runDeeper({
               {
                 role: "system",
                 content:
-                  "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  "Respond with plain text only. Use markdown headings '###'. No JSON. Do not ask questions. Do not invent numbers.",
               },
               { role: "user", content: prompt },
             ],
@@ -853,14 +947,15 @@ async function runVerify({
   const otherContext = buildContextSummary(currentAnalysis, key);
   const serializedCaseFile = caseFile ? JSON.stringify(caseFile) : null;
   const prompt = [
-    "You are a senior product designer + product thinker.",
+    "You are a senior product designer + product owner-level product thinker.",
     `Rewrite the "${key}" card to be more realistic and grounded.`,
     `Write in ${languageLabels[language] || "English"}.`,
-    "Re-check realism, remove abstractions, add concrete constraints and assumptions.",
+    "Re-check realism, remove abstractions, and keep everything tied to the Case File.",
     "Follow the Output format exactly.",
     "Respond with plain text only. Use markdown headings '###'. No JSON.",
-    "Do not ask the user questions. Use only: 'We need to confirm:', 'Unknown:', or 'Assumption:' if needed.",
-    "Do not invent deadlines, budgets, or KPIs. If missing, use 'Not specified' or 'Assumption: ... (confidence: low)'.",
+    "No-direct-user rule: do not address the reader directly (avoid 'you') and do not ask questions.",
+    "Unknowns must start with 'Unknown:' and assumptions with 'Assumption:'.",
+    "Numbers rule (strict): remove invented targets, thresholds, sample sizes, and timelines. Keep only user-provided numbers.",
     "Avoid fluff. Every bullet must be checkable or directly useful for execution.",
     "Keep sections short with scannable bullets (no bullet longer than 3 lines). Avoid deep nesting.",
     "Every output must include at least one explicit assumption.",
@@ -900,7 +995,7 @@ async function runVerify({
               {
                 role: "system",
                 content:
-                  "Respond with plain text only. Use markdown headings '###'. No JSON.",
+                  "Respond with plain text only. Use markdown headings '###'. No JSON. Do not ask questions. Do not invent numbers.",
               },
               { role: "user", content: prompt },
             ],
@@ -936,6 +1031,39 @@ function writeSseEvent(res, event, data) {
   res.flush?.();
 }
 
+function startSseSession(res) {
+  res.socket?.setTimeout(0);
+  res.socket?.setNoDelay(true);
+  res.socket?.setKeepAlive(true);
+  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  res.setHeader("Cache-Control", "no-cache, no-transform");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+  res.write(`:${" ".repeat(2048)}\n\n`);
+  res.write(":ok\n\n");
+
+  let closed = false;
+  const ping = setInterval(() => {
+    if (closed) return;
+    res.write(": ping\n\n");
+  }, 10000);
+
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    clearInterval(ping);
+  };
+
+  res.on("close", close);
+  res.on("finish", close);
+
+  return {
+    isClosed: () => closed,
+    close,
+  };
+}
+
 
 // ------------------------------
 // Routes
@@ -953,6 +1081,11 @@ app.post("/analyze", async (req, res) => {
     const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
     const context =
       typeof req.body?.context === "string" ? req.body.context.trim() : "";
+
+    console.log("[route] /analyze called", {
+      hasTask: Boolean(task),
+      hasContext: Boolean(context),
+    });
 
     if (!task) {
       return res.status(400).json({ error: "task is required" });
@@ -1018,7 +1151,30 @@ app.post("/analyze", async (req, res) => {
   }
 });
 
+app.get("/testcases", (req, res) => {
+  const testCases = readTestCases();
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.send(JSON.stringify(testCases, null, 2));
+});
+
+app.post("/testcases", (req, res) => {
+  const testCases = req.body;
+  if (!Array.isArray(testCases)) {
+    return res.status(400).json({ error: "test cases must be an array" });
+  }
+  writeTestCases(testCases);
+  return res.json({
+    status: "ok",
+    contexts: testCases.length,
+  });
+});
+
 app.post("/analyze/stream", async (req, res) => {
+  console.log("[stream] incoming /analyze/stream", {
+    origin: req.headers.origin,
+    hasBody: Boolean(req.body),
+  });
+
   const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
   const context =
     typeof req.body?.context === "string" ? req.body.context.trim() : "";
@@ -1026,6 +1182,12 @@ app.post("/analyze/stream", async (req, res) => {
     ? req.body.keys.filter((key) => analysisKeys.includes(key))
     : analysisKeys;
   const keysToAnalyze = requestedKeys.length ? requestedKeys : analysisKeys;
+
+  console.log("[stream] request payload", {
+    hasTask: Boolean(task),
+    hasContext: Boolean(context),
+    keys: keysToAnalyze,
+  });
 
   if (!task) {
     return res.status(400).json({ error: "task is required" });
@@ -1038,18 +1200,7 @@ app.post("/analyze/stream", async (req, res) => {
   }
 
   const language = resolveLanguage(task);
-  res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-  res.setHeader("Cache-Control", "no-cache, no-transform");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("X-Accel-Buffering", "no");
-  res.flushHeaders?.();
-
-  let clientGone = false;
-  const ping = setInterval(() => res.write(": ping\n\n"), 10000);
-  res.on("close", () => {
-    clientGone = true;
-    clearInterval(ping);
-  });
+  const sse = startSseSession(res);
 
   writeSseEvent(res, "status", {
     status: "started",
@@ -1059,11 +1210,14 @@ app.post("/analyze/stream", async (req, res) => {
 
   let completed = 0;
   let caseFile = createEmptyCaseFile();
+
   try {
     for (const key of keysToAnalyze) {
-      if (clientGone) {
+      if (sse.isClosed()) {
+        console.warn("[stream] client closed connection");
         return;
       }
+
       console.log(`[stream] start key=${key}`);
       writeSseEvent(res, "status", {
         status: "key-start",
@@ -1071,6 +1225,7 @@ app.post("/analyze/stream", async (req, res) => {
         completed,
         total: keysToAnalyze.length,
       });
+
       try {
         const value = await runKeyCompletion({
           key,
@@ -1079,6 +1234,7 @@ app.post("/analyze/stream", async (req, res) => {
           language,
           caseFile,
         });
+
         try {
           caseFile = await updateCaseFile(key, value, caseFile, task, context);
           if (process.env.NODE_ENV !== "production") {
@@ -1100,6 +1256,7 @@ app.post("/analyze/stream", async (req, res) => {
         } catch (summaryError) {
           console.warn(`[summary] failed for key=${key}:`, summaryError);
         }
+
         const valueWithDebug = appendDebugLine(value, caseFile);
         writeSseEvent(res, "key", {
           key,
@@ -1109,7 +1266,8 @@ app.post("/analyze/stream", async (req, res) => {
         });
         console.log(`[stream] done key=${key} ok`);
       } catch (error) {
-        if (clientGone) {
+        if (sse.isClosed()) {
+          console.warn("[stream] client closed during key processing");
           return;
         }
         const details = error?.message ? String(error.message) : String(error);
@@ -1121,7 +1279,8 @@ app.post("/analyze/stream", async (req, res) => {
         });
         console.log(`[stream] done key=${key} error=${details}`);
       } finally {
-        if (clientGone) {
+        if (sse.isClosed()) {
+          console.warn("[stream] client closed before progress update");
           return;
         }
         completed += 1;
@@ -1133,11 +1292,11 @@ app.post("/analyze/stream", async (req, res) => {
       }
     }
   } finally {
-    clearInterval(ping);
-    if (!clientGone) {
+    if (!sse.isClosed()) {
       writeSseEvent(res, "done", { status: "done" });
       res.end();
     }
+    sse.close();
   }
 });
 
