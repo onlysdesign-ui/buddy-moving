@@ -1137,6 +1137,10 @@ app.post("/testcases", (req, res) => {
 });
 
 app.post("/analyze/stream", async (req, res) => {
+  console.log("[stream] incoming /analyze/stream", {
+    origin: req.headers.origin,
+    hasBody: Boolean(req.body),
+  });
   const task = typeof req.body?.task === "string" ? req.body.task.trim() : "";
   const context =
     typeof req.body?.context === "string" ? req.body.context.trim() : "";
@@ -1167,6 +1171,7 @@ app.post("/analyze/stream", async (req, res) => {
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
+  res.write(":ok\n\n");
 
   let clientGone = false;
   const ping = setInterval(() => res.write(": ping\n\n"), 10000);
