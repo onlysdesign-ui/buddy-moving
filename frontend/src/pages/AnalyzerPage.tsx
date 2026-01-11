@@ -3,8 +3,8 @@ import AnalysisCard from "../components/AnalysisCard";
 import {
   DEFAULT_KEYS,
   KEY_TITLES,
+  fetchAnalysis,
   runAnalysisAction,
-  streamAnalysis,
   type AnalysisKey,
 } from "../api/analyzeClient";
 
@@ -278,20 +278,6 @@ const AnalyzerPage = () => {
     const controller = new AbortController();
     const requestId = ++activeStreamId.current;
     activeController.current = controller;
-    const completedKeys = new Set<AnalysisKey>();
-    let sawAnyKey = false;
-    let sawAnyEvent = false;
-    let streamStartTimeout: number | null = null;
-
-    const markKeyDone = (key: AnalysisKey) => {
-      completedKeys.add(key);
-      if (
-        completedKeys.size === DEFAULT_KEYS.length &&
-        !controller.signal.aborted
-      ) {
-        controller.abort();
-      }
-    };
 
     setIsAnalyzing(true);
     updateProgress();
@@ -302,75 +288,39 @@ const AnalyzerPage = () => {
     });
 
     try {
-      streamStartTimeout = window.setTimeout(() => {
-        if (!sawAnyEvent && !controller.signal.aborted) {
-          controller.abort();
-        }
-      }, 10000);
-
-      await streamAnalysis({
+      const response = await fetchAnalysis({
         task: trimmedTask,
         context: trimmedContext,
         signal: controller.signal,
         keys: DEFAULT_KEYS,
-        onStatus: (payload) => {
-          sawAnyEvent = true;
-          if (payload.status === "key-start" && payload.key) {
-            setCardLoading(payload.key, true, "Analyzing…");
-            return;
-          }
-
-          if (payload.status === "started") {
-            const total =
-              typeof payload.total === "number"
-                ? payload.total
-                : DEFAULT_KEYS.length;
-            updateProgress(payload.completed ?? 0, total);
-            return;
-          }
-
-          if (payload.status === "progress") {
-            updateProgress(payload.completed, payload.total ?? DEFAULT_KEYS.length);
-          }
-        },
-        onKey: (payload) => {
-          sawAnyEvent = true;
-          const summaryValue = payload.summary ?? "";
-          const valueValue = payload.value ?? payload.summary ?? "";
-          updateAnalysisKey(payload.key, summaryValue, valueValue);
-          markKeyDone(payload.key);
-          sawAnyKey = true;
-        },
-        onError: (payload) => {
-          sawAnyEvent = true;
-          if (payload.key) {
-            setCardError(
-              payload.key,
-              payload.error || "Failed to generate.",
-              payload.details,
-            );
-            markKeyDone(payload.key);
-          } else if (payload.error) {
-            showToast(payload.error, "error");
-          }
-        },
       });
-      if (streamStartTimeout) {
-        window.clearTimeout(streamStartTimeout);
-        streamStartTimeout = null;
-      }
+
+      const analysis = response.analysis ?? {};
+      let sawAnyKey = false;
+
+      DEFAULT_KEYS.forEach((key) => {
+        const entry = analysis[key];
+        if (typeof entry === "string") {
+          updateAnalysisKey(key, entry, entry);
+          sawAnyKey = true;
+          return;
+        }
+        if (entry && typeof entry === "object") {
+          const summaryValue =
+            typeof entry.summary === "string" ? entry.summary : "";
+          const valueValue =
+            typeof entry.value === "string" ? entry.value : summaryValue;
+          updateAnalysisKey(key, summaryValue, valueValue);
+          if (summaryValue || valueValue) {
+            sawAnyKey = true;
+          }
+          return;
+        }
+        setCardError(key, "Analysis failed.", "No analysis received.");
+      });
 
       if (!sawAnyKey) {
-        DEFAULT_KEYS.forEach((key) => {
-          if (!completedKeys.has(key)) {
-            setCardError(
-              key,
-              "Analysis failed.",
-              "No streaming analysis results received.",
-            );
-          }
-        });
-        showToast("Analysis failed. No streaming results received.", "error");
+        showToast("Analysis failed. No results received.", "error");
         return;
       }
       showToast("Analysis complete.");
@@ -378,32 +328,11 @@ const AnalyzerPage = () => {
       if (controller.signal.aborted) {
         return;
       }
-      if (streamStartTimeout) {
-        window.clearTimeout(streamStartTimeout);
-        streamStartTimeout = null;
-      }
-      if (!sawAnyKey) {
-        const message =
-          error instanceof Error ? error.message : "Analysis failed.";
-        DEFAULT_KEYS.forEach((key) => {
-          if (!completedKeys.has(key)) {
-            setCardError(key, "Analysis failed.", message);
-          }
-        });
-        showToast(`Analysis failed. ${message}`, "error");
-        return;
-      }
-      DEFAULT_KEYS.forEach((key) => {
-        if (!completedKeys.has(key)) {
-          setCardError(
-            key,
-            "Analysis incomplete.",
-            error instanceof Error ? error.message : "Stream ended early.",
-          );
-        }
-      });
       const message =
         error instanceof Error ? error.message : "Analysis failed.";
+      DEFAULT_KEYS.forEach((key) => {
+        setCardError(key, "Analysis failed.", message);
+      });
       showToast(`Analysis failed. ${message}`, "error");
     } finally {
       if (activeStreamId.current === requestId) {
