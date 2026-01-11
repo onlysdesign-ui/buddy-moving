@@ -1032,15 +1032,11 @@ function writeSseEvent(res, event, data) {
 }
 
 function startSseSession(res) {
-  res.socket?.setTimeout(0);
-  res.socket?.setNoDelay(true);
-  res.socket?.setKeepAlive(true);
   res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache, no-transform");
   res.setHeader("Connection", "keep-alive");
   res.setHeader("X-Accel-Buffering", "no");
   res.flushHeaders?.();
-  res.write(`:${" ".repeat(2048)}\n\n`);
   res.write(":ok\n\n");
 
   let closed = false;
